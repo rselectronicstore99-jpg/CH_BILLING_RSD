@@ -3,7 +3,7 @@ import os
 import json
 from datetime import datetime
 from pdf_history import generate_challana_pdf, show_history_log_section
-from database import load_json, HISTORY_FILE, BASE_DIR
+from database import load_json, save_json, HISTORY_FILE, BASE_DIR
 
 AUTOSUGGEST_FILE = os.path.join(BASE_DIR, "autosuggest.json")
 
@@ -17,34 +17,34 @@ def save_json(file_path, data):
 
 def render_smart_input(label, options_list, key_prefix):
     """
-    స్మార్ట్ ఆటో-ఫిల్ ఇన్‌పుట్ సిస్టమ్:
-    పాత డేటాను సెలెక్ట్ చేయగానే కింద ఉన్న టెక్స్ట్ బాక్స్ ఆటోమేటిక్‌గా నిండుతుంది.
-    కొత్త డేటా అయితే నేరుగా అదే బాక్స్ లో టైప్ చేయవచ్చు.
+    మీరు స్కెచ్ లో చూపించిన విధంగా పక్కపక్కనే (Side-by-Side) ఉండేలా డిజైన్ చేసిన సిస్టమ్:
+    - ఎడమవైపు: మెయిన్ డేటా ఎంట్రీ బాక్స్ 
+    - కుడివైపు: చిన్న సెలెక్షన్ డౌన్ ఆరో బటన్ (▼)
     """
     clean_opts = sorted(list(set([str(x).strip().upper() for x in options_list if x])))
-    
     txt_key = f"txt_{key_prefix}"
     sel_key = f"sel_{key_prefix}"
     
-    if txt_key not in st.session_state:
-        st.session_state[txt_key] = ""
+    if txt_key not in st.session_state: st.session_state[txt_key] = ""
+    if sel_key not in st.session_state: st.session_state[sel_key] = "▼"
         
-    # డ్రాప్‌డౌన్ లో పాత వాల్యూ సెలెక్ట్ చేసినప్పుడు టెక్స్ట్ బాక్స్ ని అప్‌డేట్ చేసే లాజిక్
-    def sync_sel_to_txt():
-        picked = st.session_state[sel_key]
-        if picked and picked != "-- Select Past --":
-            st.session_state[txt_key] = picked
+    # డ్రాప్‌డౌన్ లో పాత రికార్డు ఎంచుకున్నప్పుడు ఎడమపక్క బాక్స్ ని అప్‌డేట్ చేసే ఫంక్షన్
+    def sync_drop_to_text():
+        selected = st.session_state[sel_key]
+        if selected and selected != "▼":
+            st.session_state[txt_key] = selected
 
-    # 1. పాత డేటా సెలెక్ట్ చేసుకునే చిన్న డ్రాప్‌డౌన్
-    st.selectbox(
-        f"📋 Past {label}", 
-        ["-- Select Past --"] + clean_opts, 
-        key=sel_key, 
-        on_change=sync_sel_to_txt
-    )
+    # పైభాగంలో లేబుల్
+    st.markdown(f"<p style='margin-bottom: -5px; font-weight: bold; font-size: 14px;'>{label}</p>", unsafe_allow_html=True)
     
-    # 2. మెయిన్ ఇన్‌పుట్ బాక్స్ (ఇందులోనే డేటా కనిపిస్తుంది లేదా కొత్తది టైప్ చేయవచ్చు)
-    final_val = st.text_input(f"✍️ {label} *", key=txt_key).strip().upper()
+    # ఎడమపక్క బాక్స్ మరియు కుడిపక్క ఆరో బటన్ కోసం రేషియో
+    col_txt, col_sel = st.columns([3.8, 1.2])
+    
+    with col_sel:
+        st.selectbox("Dropdown", ["▼"] + clean_opts, key=sel_key, on_change=sync_drop_to_text, label_visibility="collapsed")
+    with col_txt:
+        final_val = st.text_input("Input", key=txt_key, label_visibility="collapsed").strip().upper()
+        
     return final_val
 
 def show_billing_dashboard(current_user):
@@ -63,14 +63,14 @@ def show_billing_dashboard(current_user):
         if key not in st.session_state: 
             st.session_state[key] = value
 
-    # 🌟 3 ట్యాబ్స్ సిస్టమ్
+    # 🌟 3 ట్యాబ్స్ లేఅవుట్
     tab_create, tab_history, tab_settings = st.tabs([
         "🧾 CREATE CHALLANA", 
         "📅 BILLING HISTORY", 
         "⚙️ SHOP SETTINGS"
     ])
 
-    # ---- ఆటోసజెషన్ మెమరీ డేటా లోడ్ చేయడం ----
+    # ---- ఆటోసజెషన్ డేటాబేస్ లోడ్ చేయడం ----
     sug = load_json(AUTOSUGGEST_FILE, {
         "jurisdictions": ["GUNTUR", "TENALI"],
         "trades": ["KIRANA STORE", "GOLD SHOP", "FERTILIZER"],
@@ -86,7 +86,7 @@ def show_billing_dashboard(current_user):
         "mc_nos": []
     })
 
-    # ---- 🧾 ట్యాబ్ 1: బిల్ జనరేటర్ ----
+    # ---- 🧾 ట్యాబ్ 1: చల్లానా జనరేటర్ ----
     with tab_create:
         st.subheader("Challana Generator")
         
@@ -124,11 +124,11 @@ def show_billing_dashboard(current_user):
         with col_c2:
             st.session_state.cust_area = st.text_input("Area / Landmark", value=st.session_state.cust_area).upper()
             
-            # 1 & 2. Jurisdiction, Trade Type ఆటో-ఫిల్స్
+            # 1 & 2. Jurisdiction, Trade Type (Side-by-Side)
             final_jurisdiction = render_smart_input("Jurisdiction", sug.get("jurisdictions", []), "jur")
             final_trade = render_smart_input("Trade Type", sug.get("trades", []), "trd")
 
-        # 3, 4 & 5. Town, Village, Pincode ఆటో-ఫిల్స్
+        # 3, 4 & 5. Town, Village, Pincode (Side-by-Side)
         col_b = st.columns(3)
         with col_b[0]: final_town = render_smart_input("Town", sug.get("towns", []), "twn")
         with col_b[1]: final_vlg = render_smart_input("Village", sug.get("villages", []), "vlg")
@@ -136,7 +136,7 @@ def show_billing_dashboard(current_user):
 
         st.markdown("#### ⚖️ Weighing Scale Specifications")
         
-        # 6 నుండి 11. కాటా స్పెసిఫికేషన్స్ ఆటో-ఫిల్స్
+        # 6 నుండి 11. కాటా స్పెసిఫికేషన్స్ (Side-by-Side)
         col_i1, col_i2, col_i3 = st.columns(3)
         with col_i1:
             final_make = render_smart_input("Make", sug.get("makes", []), "mk")
@@ -153,19 +153,17 @@ def show_billing_dashboard(current_user):
         with col_fee2: item_cc = st.number_input("CC Fee", min_value=0, value=50)
         with col_fee3: item_new = st.number_input("New Fee (Sistu)", min_value=0, value=0)
         
-        # 12. M/C No ఆటో-ఫిల్
+        # 12. M/C No (Side-by-Side)
         final_mc = render_smart_input("Machine Serial No (M/C NO)", sug.get("mc_nos", []), "mc")
 
-        # ---- ఐటెమ్ యాడ్ చేయడం ----
+        # ---- ఐటెమ్ యాడ్ బటన్ రన్ లాజిక్ ----
         if st.button("➕ ADD ITEM TO CHALLANA LIST", use_container_width=True, type="secondary"):
             if not final_make or not final_model:
-                st.error("❌ దయచేసి కనీసం Make మరియు Model వివరాలను ఎంటర్ చేయండి!")
+                st.error("❌ దయచేసి కనీసం Make మరియు Model వివరాలను టైప్ లేదా సెలెక్ట్ చేయండి!")
             else:
-                # కొత్త వాల్యూస్ ని మెమరీ లోకి సేవ్ చేయడం
-                for k, v, target in [("makes", final_make, "makes"), ("models", final_model, "models"), 
-                                     ("max_caps", final_max, "max_caps"), ("min_caps", final_min, "min_caps"), 
-                                     ("classes", final_class, "classes"), ("accuracies", final_acc, "accuracies"), 
-                                     ("mc_nos", final_mc, "mc_nos")]:
+                # కొత్త వాల్యూస్ ని ఆటోసజెషన్ ఫైల్ లో అప్‌డేట్ చేయడం
+                for k, v in [("makes", final_make), ("models", final_model), ("max_caps", final_max), 
+                             ("min_caps", final_min), ("classes", final_class), ("accuracies", final_acc), ("mc_nos", final_mc)]:
                     if v and v not in sug[k]: sug[k].append(v)
                 save_json(AUTOSUGGEST_FILE, sug)
 
@@ -178,25 +176,26 @@ def show_billing_dashboard(current_user):
                     "total": (item_stamping + item_cc + item_new)
                 })
                 
-                # ఐటెమ్ యాడ్ అయ్యాక కాటా బాక్సులను క్లియర్ చేయడం
-                for key in ["txt_mk", "txt_md", "txt_mx", "txt_mn", "txt_cls", "txt_ac", "txt_mc"]:
-                    st.session_state[key] = ""
+                # ఐటెమ్ యాడ్ అయ్యాక కాటా స్పెసిఫికేషన్ బాక్సులను మరియు ఆరోలని క్లియర్/రీసెట్ చేయడం
+                for kp in ["mk", "md", "mx", "mn", "cls", "ac", "mc"]:
+                    st.session_state[f"txt_{kp}"] = ""
+                    st.session_state[f"sel_{kp}"] = "▼"
                 st.success("🎯 Item Added to List!")
                 st.rerun()
 
-        # యాడ్ అయిన ఐటెమ్స్ లిస్ట్
+        # యాడ్ చేసిన ఐటెమ్స్ టేబుల్ ప్రదర్శన
         if st.session_state.bill_items:
             st.markdown("##### 📋 Current Added Items:")
             for idx, item in enumerate(st.session_state.bill_items):
                 col_row1, col_row2 = st.columns([6, 1])
-                col_row1.info(f"Item {idx+1}: {item['make']} | Max: {item['max']} | M/C No: {item['mc_no']} | Fee: ₹{item['total']}/-")
+                col_row1.info(f"Item {idx+1}: {item['make']} | Max: {item['max']} | M/C No: {item['mc_no']} | Total: ₹{item['total']}/-")
                 if col_row2.button("🗑️ Delete", key=f"del_{idx}"):
                     st.session_state.bill_items.pop(idx)
                     st.rerun()
 
         st.divider()
         
-        # ---- చల్లానా ఫైనల్ సేవ్ చేయడం ----
+        # ---- చల్లానా సేవ్ చేసి బిల్ క్రియేట్ చేయడం ----
         if st.button("💾 GENERATE & SAVE CHALLANA", type="primary", use_container_width=True):
             if not st.session_state.cust_name: 
                 st.error("❌ Please enter Customer Name!")
@@ -205,7 +204,7 @@ def show_billing_dashboard(current_user):
             elif not final_jurisdiction or not final_town:
                 st.error("❌ Please enter Jurisdiction and Town details!")
             else:
-                # కస్టమర్ లొకేషన్ వివరాలను మెమరీ లోకి సేవ్ చేయడం
+                # లొకేషన్ రికార్డులను ఫ్యూచర్ లో వాడటానికి సేవ్ చేయడం
                 for k, v in [("jurisdictions", final_jurisdiction), ("trades", final_trade), 
                              ("towns", final_town), ("villages", final_vlg), ("pins", final_pin)]:
                     if v and v not in sug[k]: sug[k].append(v)
@@ -230,12 +229,13 @@ def show_billing_dashboard(current_user):
                         st.session_state.cust_area, final_town, final_vlg, final_pin, grand_total, current_user
                     )
                 
-                # రికార్డ్ సేవ్ అయ్యాక కస్టమర్ బాక్సులను క్లియర్ చేయడం
+                # రికార్డ్ సక్సెస్ అయ్యాక కస్టమర్ డేటా బాక్సులను క్లియర్/రీసెట్ చేయడం
                 st.session_state.bill_no = str(int(st.session_state.bill_no) + 1) if st.session_state.bill_no.isdigit() else "101"
                 st.session_state.cust_name, st.session_state.cust_phone, st.session_state.cust_pro, st.session_state.cust_area = "", "", "", ""
                 st.session_state.bill_items = []
-                for key in ["txt_jur", "txt_trd", "txt_twn", "txt_vlg", "txt_pin"]:
-                    st.session_state[key] = ""
+                for kp in ["jur", "trd", "twn", "vlg", "pin"]:
+                    st.session_state[f"txt_{kp}"] = ""
+                    st.session_state[f"sel_{kp}"] = "▼"
                     
                 st.success("🎉 Challana Saved Successfully!")
                 st.rerun()
@@ -247,4 +247,4 @@ def show_billing_dashboard(current_user):
     # ---- ⚙️ ట్యాబ్ 3: సెట్టింగ్స్ ----
     with tab_settings:
         st.markdown("### 🏪 Shop Settings")
-        st.info("💡 ఇక్కడ లోగో మరియు సంతకం అప్‌లోడ్ చేసుకోవచ్చు.")
+        st.info("💡 ఇక్కడ మీ లోగో మరియు సంతకం మేనేజ్ చేసుకోవచ్చు.")
