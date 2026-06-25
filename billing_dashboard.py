@@ -50,8 +50,7 @@ def show_billing_dashboard(current_user):
         "bill_items": [],
         "latest_pdf_path": None,
         "bill_no": "100",
-        "clear_item_fields": False,
-        "clear_customer_fields": False,
+        "clear_all_fields": False,
         "item_added_success": False,
         "challana_saved_success": False
     }
@@ -59,28 +58,27 @@ def show_billing_dashboard(current_user):
         if key not in st.session_state: 
             st.session_state[key] = value
 
-    # 🛑 [CRITICAL FIX] విజెట్స్ క్రియేట్ అవ్వడానికంటే ముందే సెషన్ స్టేట్ రీసెట్ లాజిక్ రన్ చేయడం
-    if st.session_state.clear_item_fields:
-        for kp in ["mk", "md", "mx", "mn", "cls", "ac", "mc"]:
-            st.session_state[f"txt_{kp}"] = ""
-            st.session_state[f"sel_{kp}"] = "▼"
-        st.session_state.clear_item_fields = False
-        st.session_state.item_added_success = True
-
-    if st.session_state.clear_customer_fields:
+    # 🛑 [🎯 CRITICAL FIX] చల్లానా సేవ్ అయ్యాక కస్టమర్ వివరాలు మరియు కాటా స్పెసిఫికేషన్స్ రెండూ క్లియర్ అవుతాయి!
+    if st.session_state.clear_all_fields:
         if st.session_state.bill_no.isdigit():
             st.session_state.bill_no = str(int(st.session_state.bill_no) + 1)
         else:
             st.session_state.bill_no = "101"
+            
+        # కస్టమర్ బేసిక్ టెక్స్ట్ ఫీల్డ్స్ రీసెట్
         st.session_state.cust_name = ""
         st.session_state.cust_phone = ""
         st.session_state.cust_pro = ""
         st.session_state.cust_area = ""
         st.session_state.bill_items = []
-        for kp in ["jur", "trd", "twn", "vlg", "pin"]:
+        
+        # కస్టమర్ లొకేషన్స్ (jur, trd, twn, vlg, pin) మరియు కాటా వివరాలు (mk, md, mx, mn, cls, ac, mc) అన్నీ ఒకేసారి క్లియర్
+        all_prefixes = ["jur", "trd", "twn", "vlg", "pin", "mk", "md", "mx", "mn", "cls", "ac", "mc"]
+        for kp in all_prefixes:
             st.session_state[f"txt_{kp}"] = ""
             st.session_state[f"sel_{kp}"] = "▼"
-        st.session_state.clear_customer_fields = False
+            
+        st.session_state.clear_all_fields = False
         st.session_state.challana_saved_success = True
 
     # 🌟 3 ట్యాబ్స్ లేఅవుట్
@@ -110,7 +108,6 @@ def show_billing_dashboard(current_user):
     with tab_create:
         st.subheader("Challana Generator")
         
-        # సక్సెస్ మెసేజ్‌లను సరిగ్గా ప్రదర్శించడం
         if st.session_state.item_added_success:
             st.success("🎯 Item Added to List!")
             st.session_state.item_added_success = False
@@ -152,11 +149,11 @@ def show_billing_dashboard(current_user):
         with col_c2:
             st.session_state.cust_area = st.text_input("Area / Landmark", value=st.session_state.cust_area).upper()
             
-            # 1 & 2. Jurisdiction, Trade Type (Side-by-Side)
+            # 1 & 2. Jurisdiction, Trade Type
             final_jurisdiction = render_smart_input("Jurisdiction", sug.get("jurisdictions", []), "jur")
             final_trade = render_smart_input("Trade Type", sug.get("trades", []), "trd")
 
-        # 3, 4 & 5. Town, Village, Pincode (Side-by-Side)
+        # 3, 4 & 5. Town, Village, Pincode
         col_b = st.columns(3)
         with col_b[0]: final_town = render_smart_input("Town", sug.get("towns", []), "twn")
         with col_b[1]: final_vlg = render_smart_input("Village", sug.get("villages", []), "vlg")
@@ -164,7 +161,7 @@ def show_billing_dashboard(current_user):
 
         st.markdown("#### ⚖️ Weighing Scale Specifications")
         
-        # 6 నుండి 11. కాటా స్పెసిఫికేషన్స్ (Side-by-Side)
+        # 6 నుండి 11. కాటా స్పెసిఫికేషన్స్
         col_i1, col_i2, col_i3 = st.columns(3)
         with col_i1:
             final_make = render_smart_input("Make", sug.get("makes", []), "mk")
@@ -181,7 +178,7 @@ def show_billing_dashboard(current_user):
         with col_fee2: item_cc = st.number_input("CC Fee", min_value=0, value=50)
         with col_fee3: item_new = st.number_input("New Fee (Sistu)", min_value=0, value=0)
         
-        # 12. M/C No (Side-by-Side)
+        # 12. M/C No
         final_mc = render_smart_input("Machine Serial No (M/C NO)", sug.get("mc_nos", []), "mc")
 
         # ---- ఐటెమ్ యాడ్ బటన్ రన్ లాజిక్ ----
@@ -189,7 +186,6 @@ def show_billing_dashboard(current_user):
             if not final_make or not final_model:
                 st.error("❌ దయచేసి కనీసం Make మరియు Model వివరాలను టైప్ లేదా సెలెక్ట్ చేయండి!")
             else:
-                # కొత్త వాల్యూస్ ని ఆటోసజెషన్ ఫైల్ లో అప్‌డేట్ చేయడం
                 for k, v in [("makes", final_make), ("models", final_model), ("max_caps", final_max), 
                              ("min_caps", final_min), ("classes", final_class), ("accuracies", final_acc), ("mc_nos", final_mc)]:
                     if v and v not in sug[k]: sug[k].append(v)
@@ -204,8 +200,8 @@ def show_billing_dashboard(current_user):
                     "total": (item_stamping + item_cc + item_new)
                 })
                 
-                # 🛑 క్లియర్ చేయడానికి ఫ్లాగ్ సెట్ చేసి రీరన్ చేయడం
-                st.session_state.clear_item_fields = True
+                # ఒకే బిల్లులో మరిన్ని ఐటెమ్స్ యాడ్ చేసుకోవడానికి వీలుగా ఇక్కడ ఫీల్డ్స్ క్లియర్ అవ్వవు.
+                st.session_state.item_added_success = True
                 st.rerun()
 
         # యాడ్ చేసిన ఐటెమ్స్ టేబుల్ ప్రదర్శన
@@ -229,7 +225,6 @@ def show_billing_dashboard(current_user):
             elif not final_jurisdiction or not final_town:
                 st.error("❌ Please enter Jurisdiction and Town details!")
             else:
-                # లొకేషన్ రికార్డులను ఫ్యూチャー లో వాడటానికి సేవ్ చేయడం
                 for k, v in [("jurisdictions", final_jurisdiction), ("trades", final_trade), 
                              ("towns", final_town), ("villages", final_vlg), ("pins", final_pin)]:
                     if v and v not in sug[k]: sug[k].append(v)
@@ -254,8 +249,8 @@ def show_billing_dashboard(current_user):
                         st.session_state.cust_area, final_town, final_vlg, final_pin, grand_total, current_user
                     )
                 
-                # 🛑 రికార్డ్ సక్సెస్ అయ్యాక కస్టమర్ డేటా బాక్సులను క్లియర్ చేయడానికి ఫ్లాగ్ సెట్ చేసి రీరన్ చేయడం
-                st.session_state.clear_customer_fields = True
+                # రికార్డ్ సక్సెస్ అయ్యాక కస్టమర్ వివరాలు + కాటా వివరాలు అన్నీ పూర్తిగా రీసెట్ అవుతాయి
+                st.session_state.clear_all_fields = True
                 st.rerun()
 
     # ---- 📅 ట్యాబ్ 2: హిస్టరీ ----
