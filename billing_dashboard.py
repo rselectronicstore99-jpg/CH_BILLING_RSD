@@ -15,7 +15,7 @@ def save_json(file_path, data):
         pass
 
 def show_billing_dashboard(current_user):
-    # 🔥 [రక్షణ 4] - డ్యాష్‌బోర్డ్ రన్ అవ్వగానే అన్ని సెషన్ కీస్ ఉన్నాయో లేదో సరిచూసుకుంటుంది (Fixes Line 21 AttributeError)
+    # 🔥 [రక్షణ 4] - డ్యాష్‌బోర్డ్ రన్ అవ్వగానే అన్ని సెషన్ కీస్ ఉన్నాయో లేదో సరిచూసుకుంటుంది
     dashboard_defaults = {
         "current_screen": "Create Challana",
         "manual_date": datetime.now().strftime('%d-%m-%Y'),
@@ -68,7 +68,7 @@ def show_billing_dashboard(current_user):
     sug = load_json(AUTOSUGGEST_FILE, {
         "jurisdictions": ["GUNTUR", "TENALI", "BAPATLA"], "towns": ["TENALI", "GUNTUR"], 
         "villages": ["PERAVALI"], "pins": ["522201"], "trades": ["KIRANA STORE"],
-        "makes": ["E-SCALE", "RS BRAND"], "models": ["STANDARD"],
+        "makes": ["SANIYO", "SAS"], "models": ["SWS-TT"],
         "max_caps": ["30KG"], "min_caps": ["100G"], "accuracies": ["1G"], "classes": ["CLASS-III"]
     })
 
@@ -127,44 +127,57 @@ def show_billing_dashboard(current_user):
     with col_c2:
         st.session_state.cust_area = st.text_input("Area / Landmark", value=st.session_state.cust_area).upper()
         
-        sel_j = st.selectbox("Jurisdiction", sug.get("jurisdictions", []) + ["TYPE NEW JURISDICTION"])
-        final_jurisdiction = st.text_input("Enter Jurisdiction").upper() if sel_j == "TYPE NEW JURISDICTION" else sel_j
+        # 👑 [స్మార్ట్ డ్రాప్‌డౌన్ - Jurisdiction]
+        sel_j = st.selectbox("Select Jurisdiction", ["-- Type New Below --"] + sug.get("jurisdictions", []))
+        final_jurisdiction = st.text_input("Jurisdiction *", value="" if sel_j == "-- Type New Below --" else sel_j).upper().strip()
         
-        sel_tr = st.selectbox("Trade Type", sug.get("trades", []) + ["TYPE NEW TRADE TYPE"])
-        final_trade = st.text_input("Enter Trade").upper() if sel_tr == "TYPE NEW TRADE TYPE" else sel_tr
+        # 👑 [స్మార్ట్ డ్రాప్‌డౌన్ - Trade Type]
+        sel_tr = st.selectbox("Select Trade Type", ["-- Type New Below --"] + sug.get("trades", []))
+        final_trade = st.text_input("Trade Type *", value="" if sel_tr == "-- Type New Below --" else sel_tr).upper().strip()
 
     col_b = st.columns(3)
     with col_b[0]:
-        sel_t = st.selectbox("Town", sug.get("towns", []) + ["TYPE NEW TOWN"])
-        final_town = st.text_input("Enter Town").upper() if sel_t == "TYPE NEW TOWN" else sel_t
+        # 👑 [స్మార్ట్ డ్రాప్‌డౌన్ - Town]
+        sel_t = st.selectbox("Select Town", ["-- Type New Below --"] + sug.get("towns", []))
+        final_town = st.text_input("Town *", value="" if sel_t == "-- Type New Below --" else sel_t).upper().strip()
     with col_b[1]:
-        sel_v = st.selectbox("Village", sug.get("villages", []) + ["TYPE NEW VILLAGE"])
-        final_vlg = st.text_input("Enter Village").upper() if sel_v == "TYPE NEW VILLAGE" else sel_v
+        # 👑 [స్మార్ట్ డ్రాప్‌డౌన్ - Village]
+        sel_v = st.selectbox("Select Village", ["-- Type New Below --"] + sug.get("villages", []))
+        final_vlg = st.text_input("Village", value="" if sel_v == "-- Type New Below --" else sel_v).upper().strip()
     with col_b[2]:
-        sel_p = st.selectbox("Pincode", sug.get("pins", []) + ["TYPE NEW PINCODE"])
-        final_pin = st.text_input("Enter Pincode") if sel_p == "TYPE NEW PINCODE" else sel_p
+        # 👑 [స్మార్ట్ డ్రాప్‌డౌన్ - Pincode]
+        sel_p = st.selectbox("Select Pincode", ["-- Type New Below --"] + sug.get("pins", []))
+        final_pin = st.text_input("Pincode", value="" if sel_p == "-- Type New Below --" else sel_p).strip()
 
     st.markdown("#### Items Grid Input")
     
     col_i1, col_i2, col_i3 = st.columns(3)
     with col_i1:
-        sel_mk = st.selectbox("Make", sug.get("makes", []) + ["TYPE NEW MAKE"])
-        final_make = st.text_input("New Make").upper() if sel_mk == "TYPE NEW MAKE" else sel_mk
+        # 👑 [స్మార్ట్ డ్రాప్‌డౌన్ - Make]
+        sel_mk = st.selectbox("Select Make", ["-- Type New Below --"] + sug.get("makes", []))
+        final_make = st.text_input("Make *", value="" if sel_mk == "-- Type New Below --" else sel_mk).upper().strip()
         
-        sel_mx = st.selectbox("Max Cap", sug.get("max_caps", []) + ["TYPE NEW MAX"])
-        final_max = st.text_input("New Max").upper() if sel_mx == "TYPE NEW MAX" else sel_mx
+        # 👑 [స్మార్ట్ డ్రాప్‌డౌన్ - Max Cap]
+        sel_mx = st.selectbox("Select Max Cap", ["-- Type New Below --"] + sug.get("max_caps", []))
+        final_max = st.text_input("Max Cap *", value="" if sel_mx == "-- Type New Below --" else sel_mx).upper().strip()
+        
     with col_i2:
-        sel_md = st.selectbox("Model", sug.get("models", []) + ["TYPE NEW MODEL"])
-        final_model = st.text_input("New Model").upper() if sel_md == "TYPE NEW MODEL" else sel_md
+        # 👑 [స్మార్ట్ డ్రాప్‌డౌన్ - Model]
+        sel_md = st.selectbox("Select Model", ["-- Type New Below --"] + sug.get("models", []))
+        final_model = st.text_input("Model *", value="" if sel_md == "-- Type New Below --" else sel_md).upper().strip()
         
-        sel_mn = st.selectbox("Min Cap", sug.get("min_caps", []) + ["TYPE NEW MIN"])
-        final_min = st.text_input("New Min").upper() if sel_mn == "TYPE NEW MIN" else sel_mn
+        # 👑 [స్మార్ట్ డ్రాప్‌డౌన్ - Min Cap]
+        sel_mn = st.selectbox("Select Min Cap", ["-- Type New Below --"] + sug.get("min_caps", []))
+        final_min = st.text_input("Min Cap *", value="" if sel_mn == "-- Type New Below --" else sel_mn).upper().strip()
+        
     with col_i3:
-        sel_cl = st.selectbox("Class", sug.get("classes", []) + ["TYPE NEW CLASS"])
-        final_class = st.text_input("New Class").upper() if sel_cl == "TYPE NEW CLASS" else sel_cl
+        # 👑 [స్మార్ట్ డ్రాప్‌డౌన్ - Class]
+        sel_cl = st.selectbox("Select Class", ["-- Type New Below --"] + sug.get("classes", []))
+        final_class = st.text_input("Class *", value="" if sel_cl == "-- Type New Below --" else sel_cl).upper().strip()
         
-        sel_ac = st.selectbox("Accuracy", sug.get("accuracies", []) + ["TYPE NEW ACCURACY"])
-        final_acc = st.text_input("New Accuracy").upper() if sel_ac == "TYPE NEW ACCURACY" else sel_ac
+        # 👑 [స్మార్ట్ డ్రాప్‌డౌన్ - Accuracy]
+        sel_ac = st.selectbox("Select Accuracy", ["-- Type New Below --"] + sug.get("accuracies", []))
+        final_acc = st.text_input("Accuracy *", value="" if sel_ac == "-- Type New Below --" else sel_ac).upper().strip()
 
     col_fee1, col_fee2, col_fee3 = st.columns(3)
     with col_fee1: item_stamping = st.number_input("Stamping Fee", min_value=0, value=400)
@@ -174,21 +187,24 @@ def show_billing_dashboard(current_user):
     item_mc = st.text_area("M/C Numbers (Comma separated)", value="12345")
 
     if st.button("ADD ITEM TO LIST", use_container_width=True):
-        db_changed = False
-        pairs = [("makes", final_make), ("models", final_model), ("max_caps", final_max), ("min_caps", final_min), ("classes", final_class), ("accuracies", final_acc)]
-        for k, v in pairs:
-            if v and v not in sug[k]:
-                sug[k].append(v)
-                db_changed = True
-        if db_changed: save_json(AUTOSUGGEST_FILE, sug)
+        if not final_make or not final_max or not final_model or not final_min or not final_class or not final_acc:
+            st.error("Please fill in all the mandatory item fields.")
+        else:
+            db_changed = False
+            pairs = [("makes", final_make), ("models", final_model), ("max_caps", final_max), ("min_caps", final_min), ("classes", final_class), ("accuracies", final_acc)]
+            for k, v in pairs:
+                if v and v not in sug[k]:
+                    sug[k].append(v)
+                    db_changed = True
+            if db_changed: save_json(AUTOSUGGEST_FILE, sug)
 
-        st.session_state.bill_items.append({
-            "no": str(len(st.session_state.bill_items) + 1), "make": final_make, "model": final_model, "max": final_max,
-            "min": final_min, "acc": final_acc, "class": final_class, "mc_no": item_mc,
-            "stamping": str(item_stamping), "cc": str(item_cc), "new": str(item_new), "total": (item_stamping + item_cc + item_new)
-        })
-        st.success("Item added to list.")
-        st.rerun()
+            st.session_state.bill_items.append({
+                "no": str(len(st.session_state.bill_items) + 1), "make": final_make, "model": final_model, "max": final_max,
+                "min": final_min, "acc": final_acc, "class": final_class, "mc_no": item_mc,
+                "stamping": str(item_stamping), "cc": str(item_cc), "new": str(item_new), "total": (item_stamping + item_cc + item_new)
+            })
+            st.success("Item added to list successfully & options saved for next time!")
+            st.rerun()
 
     if st.session_state.bill_items:
         st.markdown("##### Current Items Loaded:")
