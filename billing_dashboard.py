@@ -14,7 +14,6 @@ def render_smart_input(label, options_list, key_prefix):
     - కుడివైపు: చిన్న సెలెక్షన్ డౌన్ ఆరో బాక్స్ (▼)
     - కింద వైపు: వెడల్పుగా ఓపెన్ అయ్యే డ్రాప్‌డౌన్ మెనూ
     """
-    # 🌟 [CSS HACK] డ్రాప్‌డౌన్ మెనూ చిన్న కాలమ్‌లో నలిగిపోకుండా వెడల్పుగా ఓపెన్ అవ్వడానికి!
     st.markdown("""
     <style>
     div[data-baseweb="popover"] {
@@ -38,7 +37,7 @@ def render_smart_input(label, options_list, key_prefix):
     # పైభాగంలో లేబుల్
     st.markdown(f"<p style='margin-bottom: -5px; font-weight: bold; font-size: 14px;'>{label}</p>", unsafe_allow_html=True)
     
-    # 📊 స్కెచ్ మ్యాచింగ్ కోసం రేషియో మార్చాము: ఇన్‌పుట్ బాక్స్ చాలా పెద్దగా, ఆరో బాక్స్ చాలా చిన్నగా ఉంటుంది
+    # ఇన్‌పుట్ బాక్స్ చాలా పెద్దగా, ఆరో బాక్స్ చాలా చిన్నగా ఉండేలా రేషియో [4.2, 0.8]
     col_txt, col_sel = st.columns([4.2, 0.8])
     
     with col_txt:
@@ -68,10 +67,7 @@ def show_billing_dashboard(current_user):
             st.session_state[key] = value
 
     if st.session_state.clear_all_fields:
-        if st.session_state.bill_no.isdigit():
-            st.session_state.bill_no = str(int(st.session_state.bill_no) + 1)
-        else:
-            st.session_state.bill_no = "101"
+        st.session_state.bill_no = "" # కొత్త బిల్ నెంబర్ కోసం దీన్ని ఖాళీ చేస్తున్నాము
             
         st.session_state.cust_name = ""
         st.session_state.cust_phone = ""
@@ -132,7 +128,7 @@ def show_billing_dashboard(current_user):
             st.divider()
 
         history_records = load_json(HISTORY_FILE, [])
-        user_bill_numbers = [int(r.get('bill_no', 0)) for r in history_records if r.get('username') == current_user.get('Username')]
+        user_bill_numbers = [int(r.get('bill_no', 0)) for r in history_records if r.get('username') == current_user.get('Username') if str(r.get('bill_no', '')).isdigit()]
         
         next_regular_bill = str(max(user_bill_numbers) + 1) if user_bill_numbers else "100"
         if not st.session_state.bill_no: 
@@ -232,13 +228,25 @@ def show_billing_dashboard(current_user):
                     "jurisdiction": final_jurisdiction, "trade": final_trade, "town": final_town, "vlg": final_vlg, "pin": final_pin,
                     "total": grand_total, "items": st.session_state.bill_items
                 }
-                history.append(new_record)
+                
+                # 🔄 [OVERWRITE LOGIC] ఒకే బిల్ నెంబర్ రెండు సార్లు రాకుండా పాత రికార్డును వెతికే లాజిక్
+                existing_idx = None
+                for i, record in enumerate(history):
+                    if record.get('username') == current_user.get('Username') and str(record.get('bill_no')) == str(st.session_state.bill_no):
+                        existing_idx = i
+                        break
+                
+                if existing_idx is not None:
+                    history[existing_idx] = new_record  # పాత బిల్లులోనే కొత్త డేటా ఓవర్‌రైట్ అవుతుంది
+                else:
+                    history.append(new_record)         # కొత్త బిల్ నెంబర్ అయితే కింద యాడ్ అవుతుంది
+                
                 save_json(HISTORY_FILE, history)
                 
                 if not manual_mode:
                     st.session_state.latest_pdf_path = generate_challana_pdf(
-                        st.session_state.bill_no, st.session_state.manual_date, final_jurisdiction, \
-                        st.session_state.cust_name, final_trade, st.session_state.cust_pro, \
+                        st.session_state.bill_no, st.session_state.manual_date, final_jurisdiction, 
+                        st.session_state.cust_name, final_trade, st.session_state.cust_pro, 
                         st.session_state.cust_area, final_town, final_vlg, final_pin, grand_total, current_user
                     )
                 st.session_state.clear_all_fields = True
