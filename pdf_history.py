@@ -84,6 +84,7 @@ def show_history_log_section():
                 col_b1, col_b2 = st.columns(2)
                 with col_b1:
                     if st.button("📥 IMPORT THIS DATA TO MAIN GUI", key=f"imp_{idx}", type="primary", use_container_width=True):
+                        # బేసిక్ కస్టమర్ వివరాల ఇంపోర్ట్
                         st.session_state.bill_no = record.get('bill_no', '')
                         st.session_state.manual_date = record.get('date', '')
                         st.session_state.cust_name = record.get('name', '')
@@ -92,17 +93,46 @@ def show_history_log_section():
                         st.session_state.cust_area = record.get('area', '')
                         st.session_state.bill_items = record.get('items', [])
                         
-                        st.session_state["txt_jur"] = record.get('jurisdiction', '')
-                        st.session_state["txt_trd"] = record.get('trade', '')
-                        st.session_state["txt_twn"] = record.get('town', '')
-                        st.session_state["txt_vlg"] = record.get('vlg', '')
-                        st.session_state["txt_pin"] = record.get('pin', '')
+                        # 🎯 [CRITICAL FIX] లొకేషన్ డేటా మిస్ అవ్వకుండా ఉండటానికి అన్ని రకాల సాధ్యమైన కీస్ లోకి డేటాను మ్యాప్ చేయడం:
                         
+                        # 1. Jurisdiction (Judeshials)
+                        jur_val = record.get('jurisdiction', '')
+                        st.session_state.cust_jurisdiction = jur_val
+                        st.session_state.jurisdiction = jur_val
+                        st.session_state.txt_jur = jur_val
+                        
+                        # 2. Trade Type
+                        trd_val = record.get('trade', '')
+                        st.session_state.cust_trade = trd_val
+                        st.session_state.trade = trd_val
+                        st.session_state.txt_trd = trd_val
+                        
+                        # 3. Town
+                        twn_val = record.get('town', '')
+                        st.session_state.cust_town = twn_val
+                        st.session_state.town = twn_val
+                        st.session_state.txt_twn = twn_val
+                        
+                        # 4. Village
+                        vlg_val = record.get('vlg', '')
+                        st.session_state.cust_vlg = vlg_val
+                        st.session_state.cust_village = vlg_val
+                        st.session_state.vlg = vlg_val
+                        st.session_state.txt_vlg = vlg_val
+                        
+                        # 5. Pincode
+                        pin_val = record.get('pin', '')
+                        st.session_state.cust_pin = pin_val
+                        st.session_state.cust_pincode = pin_val
+                        st.session_state.pin = pin_val
+                        st.session_state.txt_pin = pin_val
+                        
+                        # డ్రాప్‌డౌన్ సెలెక్ట్ ఆరోల రీసెట్
                         for kp in ["jur", "trd", "twn", "vlg", "pin"]:
                             st.session_state[f"sel_{kp}"] = "▼"
                         
                         st.session_state.current_screen = "Create Challana"
-                        st.success("🎉 డేటా విజయవంతంగా ఇంపోర్ట్ అయింది!")
+                        st.success("🎉 బిల్ నంబర్ లొకేషన్ వివరాలతో సహా విజయవంతంగా ఇంపోర్ట్ అయింది!")
                         st.rerun()
                 with col_b2:
                     st.link_button("📲 SEND WHATSAPP REMINDER", wa_url, use_container_width=True)
@@ -141,7 +171,6 @@ def generate_challana_pdf(bill_no, bill_date, final_jurisdiction, cust_name, fin
     
     username = current_user.get('Username', '').strip()
     
-    # 🎯 [👉 STRICT FIX] కేవలం ఈ కరెంట్ షాప్/యూజర్ లోగో ఉంటేనే తీసుకుంటుంది. ఎటువంటి డీఫాల్ట్ లోగో మిక్సింగ్ ఉండదు!
     user_logo_path = None
     if username:
         for ext in ['.png', '.jpg', '.jpeg', '.PNG', '.JPG', '.JPEG']:
@@ -150,7 +179,6 @@ def generate_challana_pdf(bill_no, bill_date, final_jurisdiction, cust_name, fin
                 user_logo_path = p
                 break
 
-    # 🎯 [👉 STRICT FIX] కేవలం ఈ కరెంట్ షాప్/యూజర్ సంతకం ఉంటేనే తీసుకుంటుంది. లేదంటే ప్లెయిన్ గా వదిలేస్తుంది!
     user_sign_path = None
     if username:
         for ext in ['.png', '.jpg', '.jpeg', '.PNG', '.JPG', '.JPEG']:
@@ -164,7 +192,6 @@ def generate_challana_pdf(bill_no, bill_date, final_jurisdiction, cust_name, fin
         canvas_obj.rect(15 + offset, 15, 390, 565)
         canvas_obj.setLineWidth(1)
         
-        # లోగో ఫైల్ ఉంటేనే డ్రా చేస్తుంది, లేదంటే ప్లెయిన్ (Plain) గా ఉంటుంది
         if user_logo_path and os.path.exists(user_logo_path):
             try: canvas_obj.drawImage(user_logo_path, 22 + offset, 515, width=50, height=45, mask='auto')
             except: pass
@@ -297,7 +324,6 @@ def generate_challana_pdf(bill_no, bill_date, final_jurisdiction, cust_name, fin
         canvas_obj.setFont("Helvetica-Bold", 8)
         canvas_obj.drawRightString(395 + offset, y_total - 25, f"For {current_user.get('Shop_Name', 'RS ELECTRONIC STORE')}")
         
-        # సంతకం ఫైల్ ఉంటేనే డ్రా చేస్తుంది, లేదంటే ప్లెయిన్ (Plain) గా ఉంటుంది
         if user_sign_path and os.path.exists(user_sign_path):
             try: canvas_obj.drawImage(user_sign_path, 310 + offset, y_total - 52, width=70, height=25, mask='auto')
             except: pass
