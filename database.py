@@ -8,9 +8,11 @@ import streamlit as st
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# 📂 హిస్టరీ ఫైల్ పాత్ మరియు 🔐 లైసెన్స్ సెక్యూరిటీ కీ
-HISTORY_FILE = os.path.join(BASE_DIR, "history.json")
+# 🔐 లైసెన్స్ సెక్యూరిటీ కీ మరియు ఫైల్ పాత్‌లు
 SECRET_SALT = "RS_ELECTRONIC_SUPER_SECRET_2026"
+HISTORY_FILE = os.path.join(BASE_DIR, "history.json")
+LOGO_PATH = os.path.join(BASE_DIR, "logo.png")      # మీ లోగో ఫైల్ నేమ్
+SIGN_PATH = os.path.join(BASE_DIR, "signature.png") # మీ సంతకం ఫైల్ నేమ్
 
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
@@ -34,6 +36,25 @@ def save_json(file_path, data):
         return True
     except:
         return False
+
+def upload_to_drive(file_path):
+    # యాప్ ఎక్కడా బ్రేక్ అవ్వకుండా ఉండటానికి దీనికి సేఫ్ ట్రై-ఎక్సెప్ట్ బ్లాక్ ఇవ్వబడింది
+    try:
+        from googleapiclient.discovery import build
+        from googleapiclient.http import MediaFileUpload
+        creds_dict = get_safe_creds_dict()
+        if not creds_dict: return None
+        
+        # Drive API కి కూడా ఈ క్రెడెన్షియల్స్ పనిచేస్తాయి
+        creds = Credentials.from_service_account_info(creds_dict, scopes=["https://www.googleapis.com/auth/drive"])
+        drive_service = build('drive', 'v3', credentials=creds)
+        
+        file_metadata = {'name': os.path.basename(file_path)}
+        media = MediaFileUpload(file_path, mimetype='application/pdf')
+        file = drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+        return file.get('id')
+    except Exception as e:
+        return None
 
 def get_safe_creds_dict():
     if "google_credentials" not in st.secrets:
