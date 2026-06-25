@@ -7,17 +7,9 @@ from database import load_json, save_json, HISTORY_FILE, BASE_DIR
 
 AUTOSUGGEST_FILE = os.path.join(BASE_DIR, "autosuggest.json")
 
-def save_json(file_path, data):
-    try:
-        with open(file_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=4, ensure_ascii=False)
-        return True
-    except:
-        return False
-
 def render_smart_input(label, options_list, key_prefix):
     """
-    మీరు స్కెచ్ లో చూపించిన విధంగా పక్కపక్కనే (Side-by-Side) ఉండేలా డిజైన్ చేసిన సిస్టమ్:
+    పక్కపక్కనే (Side-by-Side) ఉండేలా డిజైన్ చేసిన సిస్టమ్:
     - ఎడమవైపు: మెయిన్ డేటా ఎంట్రీ బాక్స్ 
     - కుడివైపు: చిన్న సెలెక్షన్ డౌన్ ఆరో బటన్ (▼)
     """
@@ -57,11 +49,39 @@ def show_billing_dashboard(current_user):
         "cust_area": "",
         "bill_items": [],
         "latest_pdf_path": None,
-        "bill_no": "100"
+        "bill_no": "100",
+        "clear_item_fields": False,
+        "clear_customer_fields": False,
+        "item_added_success": False,
+        "challana_saved_success": False
     }
     for key, value in dashboard_defaults.items():
         if key not in st.session_state: 
             st.session_state[key] = value
+
+    # 🛑 [CRITICAL FIX] విజెట్స్ క్రియేట్ అవ్వడానికంటే ముందే సెషన్ స్టేట్ రీసెట్ లాజిక్ రన్ చేయడం
+    if st.session_state.clear_item_fields:
+        for kp in ["mk", "md", "mx", "mn", "cls", "ac", "mc"]:
+            st.session_state[f"txt_{kp}"] = ""
+            st.session_state[f"sel_{kp}"] = "▼"
+        st.session_state.clear_item_fields = False
+        st.session_state.item_added_success = True
+
+    if st.session_state.clear_customer_fields:
+        if st.session_state.bill_no.isdigit():
+            st.session_state.bill_no = str(int(st.session_state.bill_no) + 1)
+        else:
+            st.session_state.bill_no = "101"
+        st.session_state.cust_name = ""
+        st.session_state.cust_phone = ""
+        st.session_state.cust_pro = ""
+        st.session_state.cust_area = ""
+        st.session_state.bill_items = []
+        for kp in ["jur", "trd", "twn", "vlg", "pin"]:
+            st.session_state[f"txt_{kp}"] = ""
+            st.session_state[f"sel_{kp}"] = "▼"
+        st.session_state.clear_customer_fields = False
+        st.session_state.challana_saved_success = True
 
     # 🌟 3 ట్యాబ్స్ లేఅవుట్
     tab_create, tab_history, tab_settings = st.tabs([
@@ -90,8 +110,16 @@ def show_billing_dashboard(current_user):
     with tab_create:
         st.subheader("Challana Generator")
         
+        # సక్సెస్ మెసేజ్‌లను సరిగ్గా ప్రదర్శించడం
+        if st.session_state.item_added_success:
+            st.success("🎯 Item Added to List!")
+            st.session_state.item_added_success = False
+            
+        if st.session_state.challana_saved_success:
+            st.success("🎉 Challana Saved Successfully!")
+            st.session_state.challana_saved_success = False
+        
         if st.session_state.latest_pdf_path and os.path.exists(st.session_state.latest_pdf_path):
-            st.success("🎉 PDF విజయవంతంగా క్రియేట్ అయింది!")
             with open(st.session_state.latest_pdf_path, "rb") as f:
                 st.download_button(
                     label="📥 DOWNLOAD GENERATED CHALLANA PDF", 
@@ -176,11 +204,8 @@ def show_billing_dashboard(current_user):
                     "total": (item_stamping + item_cc + item_new)
                 })
                 
-                # ఐటెమ్ యాడ్ అయ్యాక కాటా స్పెసిఫికేషన్ బాక్సులను మరియు ఆరోలని క్లియర్/రీసెట్ చేయడం
-                for kp in ["mk", "md", "mx", "mn", "cls", "ac", "mc"]:
-                    st.session_state[f"txt_{kp}"] = ""
-                    st.session_state[f"sel_{kp}"] = "▼"
-                st.success("🎯 Item Added to List!")
+                # 🛑 క్లియర్ చేయడానికి ఫ్లాగ్ సెట్ చేసి రీరన్ చేయడం
+                st.session_state.clear_item_fields = True
                 st.rerun()
 
         # యాడ్ చేసిన ఐటెమ్స్ టేబుల్ ప్రదర్శన
@@ -204,7 +229,7 @@ def show_billing_dashboard(current_user):
             elif not final_jurisdiction or not final_town:
                 st.error("❌ Please enter Jurisdiction and Town details!")
             else:
-                # లొకేషన్ రికార్డులను ఫ్యూచర్ లో వాడటానికి సేవ్ చేయడం
+                # లొకేషన్ రికార్డులను ఫ్యూチャー లో వాడటానికి సేవ్ చేయడం
                 for k, v in [("jurisdictions", final_jurisdiction), ("trades", final_trade), 
                              ("towns", final_town), ("villages", final_vlg), ("pins", final_pin)]:
                     if v and v not in sug[k]: sug[k].append(v)
@@ -229,15 +254,8 @@ def show_billing_dashboard(current_user):
                         st.session_state.cust_area, final_town, final_vlg, final_pin, grand_total, current_user
                     )
                 
-                # రికార్డ్ సక్సెస్ అయ్యాక కస్టమర్ డేటా బాక్సులను క్లియర్/రీసెట్ చేయడం
-                st.session_state.bill_no = str(int(st.session_state.bill_no) + 1) if st.session_state.bill_no.isdigit() else "101"
-                st.session_state.cust_name, st.session_state.cust_phone, st.session_state.cust_pro, st.session_state.cust_area = "", "", "", ""
-                st.session_state.bill_items = []
-                for kp in ["jur", "trd", "twn", "vlg", "pin"]:
-                    st.session_state[f"txt_{kp}"] = ""
-                    st.session_state[f"sel_{kp}"] = "▼"
-                    
-                st.success("🎉 Challana Saved Successfully!")
+                # 🛑 రికార్డ్ సక్సెస్ అయ్యాక కస్టమర్ డేటా బాక్సులను క్లియర్ చేయడానికి ఫ్లాగ్ సెట్ చేసి రీరన్ చేయడం
+                st.session_state.clear_customer_fields = True
                 st.rerun()
 
     # ---- 📅 ట్యాబ్ 2: హిస్టరీ ----
