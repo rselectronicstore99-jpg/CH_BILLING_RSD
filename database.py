@@ -8,12 +8,32 @@ import streamlit as st
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# 🔐 లైసెన్స్ సెక్యూరిటీ కీ
+# 📂 హిస్టరీ ఫైల్ పాత్ మరియు 🔐 లైసెన్స్ సెక్యూరిటీ కీ
+HISTORY_FILE = os.path.join(BASE_DIR, "history.json")
 SECRET_SALT = "RS_ELECTRONIC_SUPER_SECRET_2026"
 
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
 ]
+
+def load_json(file_path, default_value=None):
+    if default_value is None:
+        default_value = []
+    if os.path.exists(file_path):
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except:
+            return default_value
+    return default_value
+
+def save_json(file_path, data):
+    try:
+        with open(file_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+        return True
+    except:
+        return False
 
 def get_safe_creds_dict():
     if "google_credentials" not in st.secrets:
