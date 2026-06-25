@@ -4,9 +4,6 @@ import json
 from datetime import datetime, date, timedelta
 from database import load_json, get_gspread_sheet, HISTORY_FILE, generate_system_id, register_system_customer, calculate_valid_key, SECRET_SALT
 
-# Session save file
-SESSION_FILE = "session.json" 
-
 # 1. Page Configuration
 st.set_page_config(page_title="RS Electronic Ultimate", layout="centered")
 
@@ -53,30 +50,22 @@ except Exception as e:
     st.error(f"Google Sheet Connection Error: {e}")
     st.stop()
 
-# 3. Background Auto-Login and Refresh Management via URL ID
+# 3. Background Auto-Login via URL ID Only (Safe for multi-user cloud deployments)
 url_params = st.query_params
 url_id = url_params.get("id", None)
 
-saved_user, saved_pass = None, None
-if os.path.exists(SESSION_FILE):
-    try:
-        with open(SESSION_FILE, "r") as f:
-            saved = json.load(f)
-        saved_user, saved_pass = saved.get("username"), saved.get("password")
-    except: pass
-
-# 🔥 [రక్షణ 2] - రీఫ్రెష్ అవ్వగానే ఫామ్స్ కనిపించకుండా లోడింగ్ స్పిన్నర్ రన్ అవుతుంది
-if not st.session_state.is_logged_in and (url_id or saved_user):
+# 🔥 [రక్షణ 2] - రీఫ్రెష్ అవ్వగానే ఫామ్స్ కనిపించకుండా లోడింగ్ స్пиన్నర్ రన్ అవుతుంది
+if not st.session_state.is_logged_in and url_id:
     with st.spinner("🔄 Reconnecting to your session... Please wait..."):
         try:
             rows = sheet.get_all_values()
             user_found = None
             row_idx = 1
-            target_id = url_id if url_id else saved_user
+            target_id = str(url_id).strip().upper() # Case-Insensitive Check
             
             for idx in range(1, len(rows)):
                 row = rows[idx]
-                if len(row) > 0 and str(row[0]).strip() == str(target_id).strip():
+                if len(row) > 0 and str(row[0]).strip().upper() == target_id:
                     while len(row) < 12: row.append("")
                     user_found = {
                         "Username": row[0], "Password": row[1], "Phone_No": row[2],
@@ -108,12 +97,12 @@ if not st.session_state.is_logged_in:
     with tab1:
         st.subheader("Login to your Account")
         with st.form("login_form"):
-            login_user = st.text_input("User ID / Username").strip()
+            login_user = st.text_input("User ID / Username").strip().upper() # Auto Upper-case conversion
             login_pass = st.text_input("Password", type="password", value="123").strip()
             login_submit = st.form_submit_button("Login to App", use_container_width=True)
             
             if login_submit:
-                if login_user == "admin" and login_pass == "rs2026":
+                if login_user == "ADMIN" and login_pass == "rs2026":
                     st.session_state.is_logged_in = True
                     st.session_state.user_profile = {
                         "Username": "admin", "Key_Type": "Lifetime", "Shop_Name": "RS ELECTRONICS DEVELOPER",
@@ -129,7 +118,8 @@ if not st.session_state.is_logged_in:
                         r_idx = 1
                         for idx in range(1, len(rows)):
                             row = rows[idx]
-                            if len(row) > 0 and str(row[0]).strip() == login_user and str(row[1]).strip() == login_pass:
+                            # Case-Insensitive Row Matching
+                            if len(row) > 1 and str(row[0]).strip().upper() == login_user and str(row[1]).strip() == login_pass:
                                 while len(row) < 12: row.append("")
                                 user_matched = {
                                     "Username": row[0], "Password": row[1], "Phone_No": row[2],
@@ -145,12 +135,7 @@ if not st.session_state.is_logged_in:
                             st.session_state.user_row_idx = r_idx
                             set_next_bill_no_for_user(user_matched["Username"])
                             
-                            try:
-                                with open(SESSION_FILE, "w") as f:
-                                    json.dump({"username": login_user, "password": login_pass}, f)
-                            except: pass
-                            
-                            st.query_params["id"] = login_user
+                            st.query_params["id"] = user_matched["Username"]
                             st.success("Login successful!")
                             st.rerun()
                         else:
@@ -206,11 +191,6 @@ if not st.session_state.is_logged_in:
                                 st.session_state.is_logged_in = True
                                 st.session_state.bill_no = "100"
                                 
-                                try:
-                                    with open(SESSION_FILE, "w") as f:
-                                        json.dump({"username": generated_id, "password": default_password}, f)
-                                except: pass
-                                
                                 st.query_params["id"] = generated_id
                                 st.success("Account created successfully!")
                                 st.rerun()
@@ -254,7 +234,6 @@ else:
 
 if st.sidebar.button("Logout Account"):
     st.session_state.is_logged_in = False
-    if os.path.exists(SESSION_FILE): os.remove(SESSION_FILE)
     st.query_params.clear()
     st.rerun()
 
