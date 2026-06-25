@@ -11,7 +11,7 @@ from googleapiclient.http import MediaFileUpload
 import streamlit as st
 
 # --- కాన్ఫిగరేషన్ మరియు పాత్‌లు ---
-FOLDER_ID = "1Lw45wbzgvUDsorZ8CQ6_CbiKdUCj2VuC" # మీ డిఫాల్ట్/అడ్మిన్ మాస్టర్ ఫోల్డర్ ఐడి
+FOLDER_ID = "1Lw45wbzgvUDsorZ8CQ6_CbiKdUCj2VuC" 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOGO_PATH = os.path.join(BASE_DIR, "logo.png")
 SIGN_PATH = os.path.join(BASE_DIR, "sign.png")
@@ -48,15 +48,11 @@ def get_service_account_creds():
 def get_google_credentials():
     return get_service_account_creds()
 
-# ✨ అప్‌డేట్: ఈ ఫంక్షన్ ఇప్పుడు డిఫాల్ట్ ఫోల్డర్ మరియు కస్టమర్ నిర్దిష్ట ఫోల్డర్ రెండింటికీ పనిచేస్తుంది
 def upload_to_drive(file_path, folder_id=None):
-    """గూగుల్ డ్రైవ్ లోకి ఫైల్స్ అప్‌లోడ్ చేస్తుంది. folder_id ఇస్తే ఆ కస్టమర్ ఫోల్డర్ లోకి వెళ్తుంది."""
     try:
         creds = get_google_credentials()
         if not creds: return None
         service = build('drive', 'v3', credentials=creds)
-        
-        # కస్టమర్ ఫోల్డర్ ఐడి లేకపోతే డిఫాల్ట్ మాస్టర్ ఫోల్డర్ ఐడిని వాడుకుంటుంది
         target_folder = folder_id if folder_id else FOLDER_ID
         
         file_metadata = {'name': os.path.basename(file_path), 'parents': [target_folder]}
@@ -68,10 +64,9 @@ def upload_to_drive(file_path, folder_id=None):
         return None
 
 def upload_to_customer_drive(file_path, folder_id):
-    """పాత కోడ్ లతో ఇబ్బంది లేకుండా ఉండటానికి అదనపు అలియాస్ ఫంక్షన్"""
     return upload_to_drive(file_path, folder_id)
 
-@st.cache_resource  # ✨ ఈ కొత్త లైన్ యాడ్ చేయడం వల్ల గూగుల్ షీట్ కనెక్షన్ కేవలం ఒకేసారి జరుగుతుంది, ప్రతిసారీ లోడ్ అవ్వదు!
+# ✨ FIX: రిఫ్రెష్ సమస్యలు రాకుండా ఉండటానికి ఇక్కడ cache_resource తీసివేయబడింది
 def get_gspread_sheet():
     creds_dict = get_safe_creds_dict()
     if not creds_dict: return None
@@ -86,8 +81,6 @@ def load_json(filename, default_val):
 
 def save_json(filename, data):
     with open(filename, "w") as f: json.dump(data, f, indent=4)
-
-# --- కస్టమర్ గూగుల్ డ్రైవ్ ఫోల్డర్ లో JSON మేనేజ్‌మెంట్ ---
 
 def save_json_to_customer_drive(folder_id, filename, data):
     try:
@@ -120,11 +113,9 @@ def load_json_from_customer_drive(folder_id, filename):
         creds = get_google_credentials()
         if not creds: return None
         service = build('drive', 'v3', credentials=creds)
-        
         query = f"name='{filename}' and '{folder_id}' in parents and trashed=false"
         results = service.files().list(q=query, fields="files(id)").execute()
         files = results.get('files', [])
-        
         if not files: return None
         
         file_id = files[0]['id']
@@ -132,8 +123,6 @@ def load_json_from_customer_drive(folder_id, filename):
         return json.loads(content.decode('utf-8'))
     except:
         return None
-
-# --- 🆕 సిస్టమ్ లైసెన్స్ ఫంక్షన్లు ---
 
 def generate_system_id():
     return f"RS-{uuid.uuid4().hex[:5].upper()}-SYS"

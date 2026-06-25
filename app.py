@@ -4,28 +4,22 @@ import json
 from datetime import datetime, date, timedelta
 from database import load_json, get_gspread_sheet, HISTORY_FILE, generate_system_id, register_system_customer, calculate_valid_key, SECRET_SALT
 
-# Session save file
-SESSION_FILE = "session.json" 
-
 # 1. Page Configuration
 st.set_page_config(page_title="RS Electronic Ultimate", layout="centered")
 
-# ⚙️ బిల్ నంబర్ లెక్కించే ప్రత్యేక ఫంక్షన్ (కేవలం ఆ యూజర్ బిల్స్ మాత్రమే చూస్తుంది)
+# ⚙️ బిల్ నంబర్ లెక్కించే ప్రత్యేక ఫంక్షన్
 def set_next_bill_no_for_user(username):
     history_records = load_json(HISTORY_FILE, [])
     user_bill_numbers = []
-    
     for r in history_records:
-        # రికార్డులో ఈ షాప్ యూజర్ నేమ్ ఉంటేనే లిస్ట్ లోకి తీసుకుంటుంది
         if r.get('username') == username or r.get('user_id') == username:
             try:
                 user_bill_numbers.append(int(r.get('bill_no', 0)))
             except: pass
-            
     if user_bill_numbers:
-        st.session_state.bill_no = str(max(user_bill_numbers) + 1) # పాత బిల్ నంబర్ కి +1 ప్లస్ అవుతుంది!
+        st.session_state.bill_no = str(max(user_bill_numbers) + 1)
     else:
-        st.session_state.bill_no = "100" # కొత్త షాప్ అయితే డిఫాల్ట్ గా 100 చూపిస్తుంది (వాళ్ళు 500 లేదా 1200 కి మార్చుకోవచ్చు)
+        st.session_state.bill_no = "100"
 
 # 2. Session State Variables Initialization
 if "manual_date" not in st.session_state: st.session_state.manual_date = datetime.now().strftime('%d-%m-%Y')
@@ -47,19 +41,11 @@ except Exception as e:
     st.error(f"Google Sheet Connection Error: {e}")
     st.stop()
 
-# 3. Background Auto-Login and Refresh Management via URL ID
+# 3. Background Auto-Login via URL ID (Perfect for Cloud Mobile Refresh)
 url_params = st.query_params
 url_id = url_params.get("id", None)
 
-if not st.session_state.is_logged_in:
-    saved_user, saved_pass = None, None
-    if os.path.exists(SESSION_FILE):
-        try:
-            with open(SESSION_FILE, "r") as f:
-                saved = json.load(f)
-            saved_user, saved_pass = saved.get("username"), saved.get("password")
-        except: pass
-        
+if not st.session_state.is_logged_in and url_id:
     try:
         rows = sheet.get_all_values()
         user_found = None
@@ -67,27 +53,25 @@ if not st.session_state.is_logged_in:
         
         for idx in range(1, len(rows)):
             row = rows[idx]
-            if len(row) > 0:
-                if (url_id and str(row[0]).strip() == url_id) or (saved_user and str(row[0]).strip() == saved_user):
-                    while len(row) < 12: row.append("")
-                    user_found = {
-                        "Username": row[0], "Password": row[1], "Phone_No": row[2],
-                        "Status": row[3], "Key_Type": row[4], "Expiry_Date": row[5],
-                        "Profile_Setup_Done": row[6], "Shop_Name": row[7], "Lic_1": row[8],
-                        "Lic_2": row[9], "Address_Line1": row[10], "Address_Line2": row[11]
-                    }
-                    row_idx = idx + 1
-                    break
-                    
+            if len(row) > 0 and str(row[0]).strip() == str(url_id).strip():
+                while len(row) < 12: row.append("")
+                user_found = {
+                    "Username": row[0], "Password": row[1], "Phone_No": row[2],
+                    "Status": row[3], "Key_Type": row[4], "Expiry_Date": row[5],
+                    "Profile_Setup_Done": row[6], "Shop_Name": row[7], "Lic_1": row[8],
+                    "Lic_2": row[9], "Address_Line1": row[10], "Address_Line2": row[11]
+                }
+                row_idx = idx + 1
+                break
+                
         if user_found:
             if str(user_found.get('Status', '')).strip().upper() not in ["CLOSED", "EXPIRED"]:
                 st.session_state.is_logged_in = True
                 st.session_state.user_profile = user_found
                 st.session_state.user_row_idx = row_idx
-                set_next_bill_no_for_user(user_found["Username"]) # ✨ ఆటో లాగిన్ లో బిల్ నంబర్ సెట్ అవుతుంది
-                if url_id is None:
-                    st.query_params["id"] = user_found["Username"]
-    except: pass
+                set_next_bill_no_for_user(user_found["Username"])
+    except Exception as e:
+        st.sidebar.error(f"Auto-Login Error: {e}")
 
 # 4. Screen Display Logic (If Not Logged In)
 if not st.session_state.is_logged_in:
@@ -131,18 +115,13 @@ if not st.session_state.is_logged_in:
                         st.session_state.is_logged_in = True
                         st.session_state.user_profile = user_matched
                         st.session_state.user_row_idx = r_idx
-                        set_next_bill_no_for_user(user_matched["Username"]) # ✨ మాన్యువల్ లాగిన్ లో బిల్ నంబర్ సెట్ అవుతుంది
-                        
-                        try:
-                            with open(SESSION_FILE, "w") as f:
-                                json.dump({"username": login_user, "password": login_pass}, f)
-                        except: pass
-                        
+                        set_next_bill_no_for_user(user_matched["Username"])
                         st.query_params["id"] = login_user
                         st.success("Login successful!")
                         st.rerun()
                     else:
                         st.error("Invalid User ID or Password!")
+        st.stop()
     else:
         st.title("RS Electronic Ultimate")
         st.text("Shop Details Setup & Registration (7 Days Free Trial)")
@@ -201,13 +180,7 @@ if not st.session_state.is_logged_in:
                                     "Lic_2": lic_2, "Address_Line1": addr_1, "Address_Line2": addr_2
                                 }
                                 st.session_state.is_logged_in = True
-                                st.session_state.bill_no = "100" # ✨ కొత్తగా రిజిస్టర్ అయిన కస్టమర్ ఫస్ట్ బిల్ 100 తో స్టార్ట్ అవుతుంది
-                                
-                                try:
-                                    with open(SESSION_FILE, "w") as f:
-                                        json.dump({"username": generated_id, "password": default_password}, f)
-                                except: pass
-                                
+                                st.session_state.bill_no = "100"
                                 st.query_params["id"] = generated_id
                                 st.success("Account created successfully!")
                                 st.rerun()
@@ -217,47 +190,43 @@ if not st.session_state.is_logged_in:
                         st.error(f"Error: {e}")
         st.stop()
 
-# 5. License Verification Logic
-current_user = st.session_state.user_profile
+# 5. License Verification & Dashboard Logic
+if st.session_state.is_logged_in:
+    current_user = st.session_state.user_profile
 
-if current_user.get("Key_Type") == "Trial":
-    try:
-        expiry_date = datetime.strptime(str(current_user.get("Expiry_Date")), "%Y-%m-%d").date()
-        days_left = (expiry_date - date.today()).days
-        
-        if days_left < 0:
-            st.error("Your 7-day free trial has expired.")
-            st.warning(f"Please contact the developer to activate lifetime access.\n\nSystem ID (Username): {current_user.get('Username')}")
+    if current_user.get("Key_Type") == "Trial":
+        try:
+            expiry_date = datetime.strptime(str(current_user.get("Expiry_Date")), "%Y-%m-%d").date()
+            days_left = (expiry_date - date.today()).days
             
-            input_key = st.text_input("Enter Activation Key:").strip().upper()
-            
-            if st.button("Activate App", type="primary", use_container_width=True):
-                correct_key = calculate_valid_key(current_user.get('Username'))
+            if days_left < 0:
+                st.error("Your 7-day free trial has expired.")
+                st.warning(f"Please contact the developer to activate lifetime access.\n\nSystem ID (Username): {current_user.get('Username')}")
+                input_key = st.text_input("Enter Activation Key:").strip().upper()
                 
-                if input_key == correct_key:
-                    try:
-                        sheet.update_cell(st.session_state.user_row_idx, 5, "Lifetime")
-                        st.session_state.user_profile["Key_Type"] = "Lifetime"
-                        st.success("App successfully activated for lifetime!")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Activation Error: {e}")
-                else:
-                    st.error("Invalid activation key.")
-            st.stop()
-        else: 
-            st.sidebar.warning(f"Trial: {days_left} Days Left")
-    except: pass
-else:
-    st.sidebar.success("PREMIUM LIFETIME")
+                if st.button("Activate App", type="primary", use_container_width=True):
+                    correct_key = calculate_valid_key(current_user.get('Username'))
+                    if input_key == correct_key:
+                        try:
+                            sheet.update_cell(st.session_state.user_row_idx, 5, "Lifetime")
+                            st.session_state.user_profile["Key_Type"] = "Lifetime"
+                            st.success("App successfully activated for lifetime!")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Activation Error: {e}")
+                    else:
+                        st.error("Invalid activation key.")
+                st.stop()
+            else: 
+                st.sidebar.warning(f"Trial: {days_left} Days Left")
+        except: pass
+    else:
+        st.sidebar.success("PREMIUM LIFETIME")
 
-if st.sidebar.button("Logout Account"):
-    st.session_state.is_logged_in = False
-    if os.path.exists(SESSION_FILE): os.remove(SESSION_FILE)
-    st.query_params.clear()
-    st.rerun()
+    if st.sidebar.button("Logout Account"):
+        st.session_state.is_logged_in = False
+        st.query_params.clear()
+        st.rerun()
 
-st.sidebar.info(f"ID: {current_user.get('Username')}")
-
-# Run main dashboard module
-show_billing_dashboard(current_user)
+    st.sidebar.info(f"ID: {current_user.get('Username')}")
+    show_billing_dashboard(current_user)
