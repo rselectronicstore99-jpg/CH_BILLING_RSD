@@ -72,6 +72,31 @@ def show_history_log_section():
     
     tab1, tab2 = st.tabs(["📋 DETAILED HISTORY LOGS", "📲 QUICK WHATSAPP LIST"])
     
+    # 🎯 [CRITICAL SAFE FIX] StreamlitAPIException నిరోధించడానికి సేఫ్ కాల్‌బ్యాక్ ఫంక్షన్
+    def safe_import_bill_callback(rec):
+        st.session_state.bill_no = rec.get('bill_no', '')
+        st.session_state.manual_date = rec.get('date', '')
+        st.session_state.cust_name = rec.get('name', '')
+        st.session_state.cust_phone = rec.get('phone', '')
+        st.session_state.cust_pro = rec.get('pro', '')
+        st.session_state.cust_area = rec.get('area', '')
+        st.session_state.bill_items = rec.get('items', [])
+        
+        # లొకేషన్ వివరాల మ్యాపింగ్
+        fields_map = {
+            "jur": "jurisdiction",
+            "trd": "trade",
+            "twn": "town",
+            "vlg": "vlg",
+            "pin": "pin"
+        }
+        for kp, record_key in fields_map.items():
+            val = rec.get(record_key, '')
+            st.session_state[f"txt_{kp}"] = val
+            st.session_state[f"sel_{kp}"] = "▼"
+            
+        st.session_state.current_screen = "Create Challana"
+
     with tab1:
         for idx, record in enumerate(reversed(filtered_records)):
             with st.expander(f"🧾 Bill: {record.get('bill_no')} | {record.get('date')} | {record.get('name')} | ₹{record.get('total')}/-"):
@@ -83,57 +108,15 @@ def show_history_log_section():
                 
                 col_b1, col_b2 = st.columns(2)
                 with col_b1:
-                    if st.button("📥 IMPORT THIS DATA TO MAIN GUI", key=f"imp_{idx}", type="primary", use_container_width=True):
-                        # బేసిక్ కస్టమర్ వివరాల ఇంపోర్ట్
-                        st.session_state.bill_no = record.get('bill_no', '')
-                        st.session_state.manual_date = record.get('date', '')
-                        st.session_state.cust_name = record.get('name', '')
-                        st.session_state.cust_phone = record.get('phone', '')
-                        st.session_state.cust_pro = record.get('pro', '')
-                        st.session_state.cust_area = record.get('area', '')
-                        st.session_state.bill_items = record.get('items', [])
-                        
-                        # 🎯 [CRITICAL FIX] లొకేషన్ డేటా మిస్ అవ్వకుండా ఉండటానికి అన్ని రకాల సాధ్యమైన కీస్ లోకి డేటాను మ్యాప్ చేయడం:
-                        
-                        # 1. Jurisdiction (Judeshials)
-                        jur_val = record.get('jurisdiction', '')
-                        st.session_state.cust_jurisdiction = jur_val
-                        st.session_state.jurisdiction = jur_val
-                        st.session_state.txt_jur = jur_val
-                        
-                        # 2. Trade Type
-                        trd_val = record.get('trade', '')
-                        st.session_state.cust_trade = trd_val
-                        st.session_state.trade = trd_val
-                        st.session_state.txt_trd = trd_val
-                        
-                        # 3. Town
-                        twn_val = record.get('town', '')
-                        st.session_state.cust_town = twn_val
-                        st.session_state.town = twn_val
-                        st.session_state.txt_twn = twn_val
-                        
-                        # 4. Village
-                        vlg_val = record.get('vlg', '')
-                        st.session_state.cust_vlg = vlg_val
-                        st.session_state.cust_village = vlg_val
-                        st.session_state.vlg = vlg_val
-                        st.session_state.txt_vlg = vlg_val
-                        
-                        # 5. Pincode
-                        pin_val = record.get('pin', '')
-                        st.session_state.cust_pin = pin_val
-                        st.session_state.cust_pincode = pin_val
-                        st.session_state.pin = pin_val
-                        st.session_state.txt_pin = pin_val
-                        
-                        # డ్రాప్‌డౌన్ సెలెక్ట్ ఆరోల రీసెట్
-                        for kp in ["jur", "trd", "twn", "vlg", "pin"]:
-                            st.session_state[f"sel_{kp}"] = "▼"
-                        
-                        st.session_state.current_screen = "Create Challana"
-                        st.success("🎉 బిల్ నంబర్ లొకేషన్ వివరాలతో సహా విజయవంతంగా ఇంపోర్ట్ అయింది!")
-                        st.rerun()
+                    # 🚀 కాల్‌బ్యాక్ ఉపయోగించి బటన్ ని మోడిఫై చేసాము
+                    st.button(
+                        "📥 IMPORT THIS DATA TO MAIN GUI", 
+                        key=f"imp_{idx}", 
+                        type="primary", 
+                        use_container_width=True,
+                        on_click=safe_import_bill_callback,
+                        args=(record,)
+                    )
                 with col_b2:
                     st.link_button("📲 SEND WHATSAPP REMINDER", wa_url, use_container_width=True)
 

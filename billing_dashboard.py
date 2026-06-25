@@ -9,10 +9,20 @@ AUTOSUGGEST_FILE = os.path.join(BASE_DIR, "autosuggest.json")
 
 def render_smart_input(label, options_list, key_prefix):
     """
-    మీ డ్రాయింగ్ ప్రకారం పక్కపక్కనే (Side-by-Side) ఉండేలా డిజైన్ చేసిన సిస్టమ్:
-    - ఎడమవైపు: మెయిన్ డేటా ఎంట్రీ బాక్స్ 
-    - కుడివైపు: చిన్న సెలెక్షన్ డౌన్ ఆరో బటన్ (▼)
+    మీ స్కెచ్ ప్రకారం డిజైన్ చేయబడిన సిస్టమ్:
+    - ఎడమవైపు: పెద్ద మెయిన్ డేటా ఎంట్రీ బాక్స్ (Wide Rectangle)
+    - కుడివైపు: చిన్న సెలెక్షన్ డౌన్ ఆరో బాక్స్ (▼)
+    - కింద వైపు: వెడల్పుగా ఓపెన్ అయ్యే డ్రాప్‌డౌన్ మెనూ
     """
+    # 🌟 [CSS HACK] డ్రాప్‌డౌన్ మెనూ చిన్న కాలమ్‌లో నలిగిపోకుండా వెడల్పుగా ఓపెన్ అవ్వడానికి!
+    st.markdown("""
+    <style>
+    div[data-baseweb="popover"] {
+        min-width: 320px !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
     clean_opts = sorted(list(set([str(x).strip().upper() for x in options_list if x])))
     txt_key = f"txt_{key_prefix}"
     sel_key = f"sel_{key_prefix}"
@@ -28,13 +38,13 @@ def render_smart_input(label, options_list, key_prefix):
     # పైభాగంలో లేబుల్
     st.markdown(f"<p style='margin-bottom: -5px; font-weight: bold; font-size: 14px;'>{label}</p>", unsafe_allow_html=True)
     
-    # బాక్స్ లు ఇరుకుగా అవ్వకుండా వెడల్పు రేషియో అడ్జస్ట్మెంట్ [4.0, 1.0]
-    col_txt, col_sel = st.columns([4.0, 1.0])
+    # 📊 స్కెచ్ మ్యాచింగ్ కోసం రేషియో మార్చాము: ఇన్‌పుట్ బాక్స్ చాలా పెద్దగా, ఆరో బాక్స్ చాలా చిన్నగా ఉంటుంది
+    col_txt, col_sel = st.columns([4.2, 0.8])
     
-    with col_sel:
-        st.selectbox("Dropdown", ["▼"] + clean_opts, key=sel_key, on_change=sync_drop_to_text, label_visibility="collapsed")
     with col_txt:
         final_val = st.text_input("Input", key=txt_key, label_visibility="collapsed").strip().upper()
+    with col_sel:
+        st.selectbox("Dropdown", ["▼"] + clean_opts, key=sel_key, on_change=sync_drop_to_text, label_visibility="collapsed")
         
     return final_val
 
@@ -149,32 +159,26 @@ def show_billing_dashboard(current_user):
         with col_b[1]: final_vlg = render_smart_input("Village", sug.get("villages", []), "vlg")
         with col_b[2]: final_pin = render_smart_input("Pincode", sug.get("pins", []), "pin")
 
-        # ⚖️ [🎯 మీ డ్రాయింగ్ డిజైన్ ఫిక్స్ ఇక్కడ ఉంది]
         st.markdown("#### ⚖️ Weighing Scale Specifications")
         
-        col_left, col_right = st.columns(2) # 2 కాలమ్స్ లోకి మార్చడం వల్ల బాక్స్ లు వెడల్పుగా ఓపెన్ అవుతాయి
-        
-        with col_left:
-            # మీ డ్రాయింగ్ లో ఉన్నట్లుగా ఒకదాని కింద ఒకటి వరుసగా వచ్చేలా అమరిక:
+        col_i1, col_i2, col_i3 = st.columns(3)
+        with col_i1:
             final_make = render_smart_input("Make", sug.get("makes", []), "mk")
-            final_model = render_smart_input("Model", sug.get("models", []), "md")
             final_max = render_smart_input("Max Cap", sug.get("max_caps", []), "mx")
-            final_mc = render_smart_input("Machine Serial No (M/C NO)", sug.get("mc_nos", []), "mc") # 4వ బాక్స్
-            
-        with col_right:
-            # మిగిలిన ఆప్షన్స్ అన్నీ కుడి పక్క కాలమ్ లోకి సర్దడం జరిగింది:
-            final_class = render_smart_input("Class", sug.get("classes", []), "cls")
+        with col_i2:
+            final_model = render_smart_input("Model", sug.get("models", []), "md")
             final_min = render_smart_input("Min Cap", sug.get("min_caps", []), "mn")
+        with col_i3:
+            final_class = render_smart_input("Class", sug.get("classes", []), "cls")
             final_acc = render_smart_input("Accuracy", sug.get("accuracies", []), "ac")
 
-        # ఫీజు వివరాలు కింద లైన్ లో వస్తాయి
-        st.write("")
         col_fee1, col_fee2, col_fee3 = st.columns(3)
         with col_fee1: item_stamping = st.number_input("Stamping Fee", min_value=0, value=400)
         with col_fee2: item_cc = st.number_input("CC Fee", min_value=0, value=50)
         with col_fee3: item_new = st.number_input("New Fee (Sistu)", min_value=0, value=0)
+        
+        final_mc = render_smart_input("Machine Serial No (M/C NO)", sug.get("mc_nos", []), "mc")
 
-        # ---- ఐటెమ్ యాడ్ బటన్ లాజిక్ ----
         if st.button("➕ ADD ITEM TO CHALLANA LIST", use_container_width=True, type="secondary"):
             if not final_make or not final_model:
                 st.error("❌ దయచేసి కనీసం Make మరియు Model వివరాలను టైప్ లేదా సెలెక్ట్ చేయండి!")
@@ -233,8 +237,8 @@ def show_billing_dashboard(current_user):
                 
                 if not manual_mode:
                     st.session_state.latest_pdf_path = generate_challana_pdf(
-                        st.session_state.bill_no, st.session_state.manual_date, final_jurisdiction, 
-                        st.session_state.cust_name, final_trade, st.session_state.cust_pro, 
+                        st.session_state.bill_no, st.session_state.manual_date, final_jurisdiction, \
+                        st.session_state.cust_name, final_trade, st.session_state.cust_pro, \
                         st.session_state.cust_area, final_town, final_vlg, final_pin, grand_total, current_user
                     )
                 st.session_state.clear_all_fields = True
