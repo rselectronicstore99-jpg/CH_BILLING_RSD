@@ -18,13 +18,12 @@ def draw_cell_text(canvas_obj, text, x, y, max_width, font_name="Helvetica-Bold"
         text = text[:-1]
     canvas_obj.drawString(x, y, text)
 
-# 🔍 హిస్టరీ సెక్షన్ విత్ ఆల్ సెర్చ్ ఫిల్టర్స్ అండ్ ఇంపోర్ట్ ఫీచర్!
 def show_history_log_section():
     st.markdown("### 📅 Filter & Search History Logs")
     history_records = load_json(HISTORY_FILE, [])
     
     if not history_records:
-        st.info("ఈ ఆర్థిక సంవత్సరానికి ఎటువంటి హిస్టరీ డేటా రికార్డ్ అవ్వలేదు.")
+        st.info("ఈ ఆర్థిక సంవత్సరానికి ఎటువంటి హిస్టరీ డేటా రിക്കార్డ్ అవ్వలేదు.")
         return
 
     alert_templates = [
@@ -39,14 +38,12 @@ def show_history_log_section():
             try:
                 d = datetime.strptime(record.get('date', ''), '%d-%m-%Y').date()
                 parsed_dates.append(d)
-            except:
-                pass
-        if parsed_dates:
-            default_start_date = min(parsed_dates)
+            except: pass
+        if parsed_dates: default_start_date = min(parsed_dates)
 
     col_d1, col_d2 = st.columns(2)
-    with col_d1: start_date = st.date_input("From Date (నుండి)", value=default_start_date)
-    with col_d2: end_date = st.date_input("To Date (వరకు)", value=datetime.now().date())
+    with col_d1: start_date = st.date_input("From Date", value=default_start_date)
+    with col_d2: end_date = st.date_input("To Date", value=datetime.now().date())
         
     col_s1, col_s2, col_s3 = st.columns(3)
     with col_s1: search_name = st.text_input("👤 Search Customer Name").strip().upper()
@@ -62,45 +59,18 @@ def show_history_log_section():
                 rec_date = datetime.strptime(record.get('date', ''), '%d-%m-%Y').date()
                 if not (start_date <= rec_date <= end_date): continue
             except: pass
-            
         if search_name and search_name not in record.get('name', '').upper(): continue
         if search_phone and search_phone not in record.get('phone', ''): continue
         if search_bill and search_bill not in record.get('bill_no', ''): continue
         filtered_records.append(record)
             
     st.markdown(f"🔍 లభించిన రికార్డులు: **{len(filtered_records)}**")
-    
     tab1, tab2 = st.tabs(["📋 DETAILED HISTORY LOGS", "📲 QUICK WHATSAPP LIST"])
     
-    # 🎯 [CRITICAL SAFE FIX] StreamlitAPIException నిరోధించడానికి సేఫ్ కాల్‌బ్యాక్ ఫంక్షన్
-    def safe_import_bill_callback(rec):
-        st.session_state.bill_no = rec.get('bill_no', '')
-        st.session_state.manual_date = rec.get('date', '')
-        st.session_state.cust_name = rec.get('name', '')
-        st.session_state.cust_phone = rec.get('phone', '')
-        st.session_state.cust_pro = rec.get('pro', '')
-        st.session_state.cust_area = rec.get('area', '')
-        st.session_state.bill_items = rec.get('items', [])
-        
-        # లొకేషన్ వివరాల మ్యాపింగ్
-        fields_map = {
-            "jur": "jurisdiction",
-            "trd": "trade",
-            "twn": "town",
-            "vlg": "vlg",
-            "pin": "pin"
-        }
-        for kp, record_key in fields_map.items():
-            val = rec.get(record_key, '')
-            st.session_state[f"txt_{kp}"] = val
-            st.session_state[f"sel_{kp}"] = "▼"
-            
-        st.session_state.current_screen = "Create Challana"
-
     with tab1:
         for idx, record in enumerate(reversed(filtered_records)):
             with st.expander(f"🧾 Bill: {record.get('bill_no')} | {record.get('date')} | {record.get('name')} | ₹{record.get('total')}/-"):
-                st.write(f"📍 **Address:** {record.get('town')}, {record.get('vlg')} ({record.get('pin')}) | 📞 **Phone:** {record.get('phone')}")
+                st.write(f"📍 **Address:** {record.get('town')}, {record.get('vlg')} | 📞 **Phone:** {record.get('phone')}")
                 st.table(record.get('items', []))
                 
                 chosen_template = st.selectbox("Select Alert Message", alert_templates, key=f"tpl_{idx}")
@@ -108,43 +78,61 @@ def show_history_log_section():
                 
                 col_b1, col_b2 = st.columns(2)
                 with col_b1:
-                    # 🚀 కాల్‌బ్యాక్ ఉపయోగించి బటన్ ని మోడిఫై చేసాము
-                    st.button(
-                        "📥 IMPORT THIS DATA TO MAIN GUI", 
-                        key=f"imp_{idx}", 
-                        type="primary", 
-                        use_container_width=True,
-                        on_click=safe_import_bill_callback,
-                        args=(record,)
-                    )
+                    if st.button("📥 IMPORT THIS DATA TO MAIN GUI", key=f"imp_{idx}", type="primary", use_container_width=True):
+                        
+                        # [🎯 CRITICAL FIX]: చెక్‌బాక్స్ ఆన్ లో ఉందా లేదా అని చెక్ చేసే కండిషన్
+                        is_manual_on = st.session_state.get("manual_mode_checkbox", False)
+                        
+                        if is_manual_on:
+                            # Manual Mode ON లో ఉంటే: పాత బిల్ నెంబర్ మరియు పాత డేట్ కూడా ఇంపోర్ట్ అవుతాయి
+                            st.session_state.bill_no = record.get('bill_no', '')
+                            st.session_state.manual_date = record.get('date', '')
+                        else:
+                            # Manual Mode OFF లో ఉంటే: పాత బిల్ నెంబర్, డేట్ రావు (ప్రస్తుత రన్నింగ్ సీరియల్స్ అలాగే ఉంటాయి)
+                            pass
+                        
+                        # మిగిలిన కస్టమర్ మరియు కాటా వివరాలు ఎప్పుడూ ఇంపోర్ట్ అవుతాయి
+                        st.session_state.cust_name = record.get('name', '')
+                        st.session_state.cust_phone = record.get('phone', '')
+                        st.session_state.cust_pro = record.get('pro', '')
+                        st.session_state.cust_area = record.get('area', '')
+                        st.session_state.bill_items = record.get('items', [])
+                        
+                        st.session_state.txt_jur = record.get('jurisdiction', '')
+                        st.session_state.txt_trd = record.get('trade', '')
+                        st.session_state.txt_twn = record.get('town', '')
+                        st.session_state.txt_vlg = record.get('vlg', '')
+                        st.session_state.txt_pin = record.get('pin', '')
+                        
+                        if record.get('items') and len(record.get('items')) > 0:
+                            first_item = record.get('items')[0]
+                            st.session_state.txt_mk = first_item.get('make', '')
+                            st.session_state.txt_md = first_item.get('model', '')
+                            st.session_state.txt_mx = first_item.get('max', '')
+                            st.session_state.txt_mn = first_item.get('min', '')
+                            st.session_state.txt_cls = first_item.get('class', '')
+                            st.session_state.txt_ac = first_item.get('acc', '')
+                            st.session_state.txt_mc = first_item.get('mc_no', '')
+                        
+                        for kp in ["jur", "trd", "twn", "vlg", "pin", "mk", "md", "mx", "mn", "cls", "ac", "mc"]:
+                            st.session_state[f"sel_{kp}"] = "▼"
+                        
+                        st.success("🎉 డేటా విజయవంతంగా ఇంపోర్ట్ చేయబడింది!")
+                        st.rerun()
                 with col_b2:
                     st.link_button("📲 SEND WHATSAPP REMINDER", wa_url, use_container_width=True)
 
     with tab2:
-        st.markdown("#### ⚡ Fast WhatsApp Reminder Panel")
         global_template = st.selectbox("Select Message Template for List", alert_templates, key="global_wa_tpl")
-        st.write("")
-        
-        col_h1, col_h2, col_h3, col_h4, col_h5 = st.columns([1.2, 2.5, 1.5, 1.5, 1.5])
-        col_h1.markdown("**DATE**")
-        col_h2.markdown("**CUSTOMER (M/S)**")
-        col_h3.markdown("**PHONE NO**")
-        col_h4.markdown("**TOWN**")
-        col_h5.markdown("**ACTION**")
-        st.divider()
-        
         for idx, record in enumerate(reversed(filtered_records)):
             col1, col2, col3, col4, col5 = st.columns([1.2, 2.5, 1.5, 1.5, 1.5])
             col1.write(record.get('date', ''))
             col2.write(record.get('name', ''))
             col3.write(record.get('phone', ''))
             col4.write(record.get('town', ''))
-            
             quick_wa_url = f"https://wa.me/91{record.get('phone')}?text={urllib.parse.quote(global_template)}"
             col5.link_button("📲 SEND WA", quick_wa_url, use_container_width=True, key=f"qwa_{idx}")
 
-
-# 🖨️ PDF మేకింగ్ ఇంజిన్
 def generate_challana_pdf(bill_no, bill_date, final_jurisdiction, cust_name, final_trade, cust_pro, cust_area, final_town, final_vlg, final_pin, grand_total, current_user):
     pdf_filename = os.path.join(BASE_DIR, f"CH_{bill_no}.pdf")
     canvas_obj = canvas.Canvas(pdf_filename, pagesize=landscape(A4))
@@ -153,22 +141,8 @@ def generate_challana_pdf(bill_no, bill_date, final_jurisdiction, cust_name, fin
     canvas_obj.line(421, 15, 421, 580)
     
     username = current_user.get('Username', '').strip()
-    
-    user_logo_path = None
-    if username:
-        for ext in ['.png', '.jpg', '.jpeg', '.PNG', '.JPG', '.JPEG']:
-            p = os.path.join(BASE_DIR, f"{username}_logo{ext}")
-            if os.path.exists(p):
-                user_logo_path = p
-                break
-
-    user_sign_path = None
-    if username:
-        for ext in ['.png', '.jpg', '.jpeg', '.PNG', '.JPG', '.JPEG']:
-            p = os.path.join(BASE_DIR, f"{username}_sign{ext}")
-            if os.path.exists(p):
-                user_sign_path = p
-                break
+    user_logo_path = os.path.join(BASE_DIR, f"{username}_logo.png") if username else None
+    user_sign_path = os.path.join(BASE_DIR, f"{username}_sign.png") if username else None
     
     for offset in [0, 421]:
         canvas_obj.setLineWidth(1.2)
@@ -181,7 +155,6 @@ def generate_challana_pdf(bill_no, bill_date, final_jurisdiction, cust_name, fin
         
         canvas_obj.setFont("Helvetica-Bold", 14)
         canvas_obj.drawCentredString(210 + offset, 562, "CHALLANA")
-        
         canvas_obj.setFont("Helvetica-Bold", 8)
         canvas_obj.drawRightString(395 + offset, 552, f"LIC NO: {current_user.get('Lic_1', '')}")
         canvas_obj.drawRightString(395 + offset, 541, f"CELL NO: {current_user.get('Phone_No', '')}")
@@ -194,7 +167,6 @@ def generate_challana_pdf(bill_no, bill_date, final_jurisdiction, cust_name, fin
         canvas_obj.setFont("Helvetica", 7.5)
         shop_addr1 = str(current_user.get('Address_Line1', '')).upper().strip()
         shop_addr2 = str(current_user.get('Address_Line2', '')).upper().strip()
-        
         if shop_addr1 and shop_addr2:
             canvas_obj.drawCentredString(210 + offset, 492, shop_addr1)
             canvas_obj.drawCentredString(210 + offset, 483, shop_addr2)
@@ -202,7 +174,6 @@ def generate_challana_pdf(bill_no, bill_date, final_jurisdiction, cust_name, fin
             canvas_obj.drawCentredString(210 + offset, 488, shop_addr1)
             
         canvas_obj.line(15 + offset, 474, 405 + offset, 474)
-        
         canvas_obj.setFont("Helvetica-Bold", 9.5)
         canvas_obj.drawString(25 + offset, 459, f"NO: {bill_no}")
         canvas_obj.drawCentredString(210 + offset, 459, f"DATE: {bill_date}")
@@ -233,13 +204,11 @@ def generate_challana_pdf(bill_no, bill_date, final_jurisdiction, cust_name, fin
         header_bottom = table_top - header_height
         canvas_obj.line(25 + offset, table_top, 395 + offset, table_top)
         canvas_obj.line(25 + offset, header_bottom, 395 + offset, header_bottom)
-        for cx in cols_x:
-            canvas_obj.line(cx, table_top, cx, header_bottom)
+        for cx in cols_x: canvas_obj.line(cx, table_top, cx, header_bottom)
             
         canvas_obj.setFont("Helvetica-Bold", 8)
         headers = ["NO", "MAKE", "MODEL", "MAX", "MIN", "ACC", "CLASS", "M/C NO", "FEE DETAILS"]
-        for h_idx, text in enumerate(headers):
-            canvas_obj.drawString(cols_x[h_idx] + 3, header_bottom + 5, text)
+        for h_idx, text in enumerate(headers): canvas_obj.drawString(cols_x[h_idx] + 3, header_bottom + 5, text)
             
         row_height = 35
         fixed_rows_count = 6
@@ -247,10 +216,8 @@ def generate_challana_pdf(bill_no, bill_date, final_jurisdiction, cust_name, fin
         for idx in range(fixed_rows_count):
             current_row_top = header_bottom - (idx * row_height)
             current_row_bottom = current_row_top - row_height
-            
             canvas_obj.line(25 + offset, current_row_bottom, 395 + offset, current_row_bottom)
-            for cx in cols_x:
-                canvas_obj.line(cx, current_row_top, cx, current_row_bottom)
+            for cx in cols_x: canvas_obj.line(cx, current_row_top, cx, current_row_bottom)
                 
             fee_col_start = cols_x[8]
             fee_col_end = 395 + offset
@@ -261,25 +228,18 @@ def generate_challana_pdf(bill_no, bill_date, final_jurisdiction, cust_name, fin
             if idx < len(st.session_state.bill_items):
                 item = st.session_state.bill_items[idx]
                 text_y = current_row_top - 21
-                
-                draw_cell_text(canvas_obj, item.get('no', ''), cols_x[0]+3, text_y, col_widths[0]-4, font_name="Helvetica-Bold", font_size=7.5)
-                draw_cell_text(canvas_obj, item.get('make', ''), cols_x[1]+3, text_y, col_widths[1]-4, font_name="Helvetica-Bold", font_size=7.5)
-                draw_cell_text(canvas_obj, item.get('model', ''), cols_x[2]+3, text_y, col_widths[2]-4, font_name="Helvetica-Bold", font_size=7.5)
-                draw_cell_text(canvas_obj, item.get('max', ''), cols_x[3]+3, text_y, col_widths[3]-4, font_name="Helvetica-Bold", font_size=7.5)
-                draw_cell_text(canvas_obj, item.get('min', ''), cols_x[4]+3, text_y, col_widths[4]-4, font_name="Helvetica-Bold", font_size=7.5)
-                draw_cell_text(canvas_obj, item.get('acc', ''), cols_x[5]+3, text_y, col_widths[5]-4, font_name="Helvetica-Bold", font_size=7.5)
-                draw_cell_text(canvas_obj, item.get('class', ''), cols_x[6]+3, text_y, col_widths[6]-4, font_name="Helvetica-Bold", font_size=7.5)
+                draw_cell_text(canvas_obj, item.get('no', ''), cols_x[0]+3, text_y, col_widths[0]-4, font_size=7.5)
+                draw_cell_text(canvas_obj, item.get('make', ''), cols_x[1]+3, text_y, col_widths[1]-4, font_size=7.5)
+                draw_cell_text(canvas_obj, item.get('model', ''), cols_x[2]+3, text_y, col_widths[2]-4, font_size=7.5)
+                draw_cell_text(canvas_obj, item.get('max', ''), cols_x[3]+3, text_y, col_widths[3]-4, font_size=7.5)
+                draw_cell_text(canvas_obj, item.get('min', ''), cols_x[4]+3, text_y, col_widths[4]-4, font_size=7.5)
+                draw_cell_text(canvas_obj, item.get('acc', ''), cols_x[5]+3, text_y, col_widths[5]-4, font_size=7.5)
+                draw_cell_text(canvas_obj, item.get('class', ''), cols_x[6]+3, text_y, col_widths[6]-4, font_size=7.5)
                 
                 mc_text = str(item.get('mc_no', ''))
-                if ',' in mc_text:
-                    mc_lines = [line.strip() for line in mc_text.split(',')]
-                else:
-                    mc_lines = [mc_text[i:i+12].strip() for i in range(0, len(mc_text), 12)]
-                mc_lines = [l for l in mc_lines if l][:3]
-                
+                mc_lines = [mc_text[i:i+12].strip() for i in range(0, len(mc_text), 12)][:3]
                 for m_idx, line_text in enumerate(mc_lines):
-                    line_y = current_row_top - 6.5 - (m_idx * 8.5)
-                    draw_cell_text(canvas_obj, line_text, cols_x[7]+3, line_y, col_widths[7]-4, font_name="Helvetica-Bold", font_size=7)
+                    canvas_obj.drawString(cols_x[7]+3, current_row_top - 6.5 - (m_idx * 8.5), line_text)
                     
                 try: stamping_val = f"{float(item.get('stamping', 0)):.2f}"
                 except: stamping_val = "0.00"
@@ -290,14 +250,14 @@ def generate_challana_pdf(bill_no, bill_date, final_jurisdiction, cust_name, fin
                 try: total_val = f"{float(item.get('total', 0)):.2f}"
                 except: total_val = "0.00"
                 
-                draw_cell_text(canvas_obj, f"STAMPING: {stamping_val}", fee_col_start+3, current_row_top - 6.5, col_widths[8]-4, font_name="Helvetica-Bold", font_size=6.5)
-                draw_cell_text(canvas_obj, f"SISTU: {sistu_val}", fee_col_start+3, current_row_top - 15, col_widths[8]-4, font_name="Helvetica-Bold", font_size=6.5)
-                draw_cell_text(canvas_obj, f"C. C: {cc_val}", fee_col_start+3, current_row_top - 23.5, col_widths[8]-4, font_name="Helvetica-Bold", font_size=6.5)
-                draw_cell_text(canvas_obj, f"TOTAL: {total_val}", fee_col_start+3, current_row_top - 32, col_widths[8]-4, font_name="Helvetica-Bold", font_size=6.5)
+                draw_cell_text(canvas_obj, f"STAMPING: {stamping_val}", fee_col_start+3, current_row_top - 6.5, col_widths[8]-4, font_size=6.5)
+                draw_cell_text(canvas_obj, f"SISTU: {sistu_val}", fee_col_start+3, current_row_top - 15, col_widths[8]-4, font_size=6.5)
+                draw_cell_text(canvas_obj, f"C. C: {cc_val}", fee_col_start+3, current_row_top - 23.5, col_widths[8]-4, font_size=6.5)
+                draw_cell_text(canvas_obj, f"TOTAL: {total_val}", fee_col_start+3, current_row_top - 32, col_widths[8]-4, font_size=6.5)
                 
         y_total = header_bottom - (fixed_rows_count * row_height) - 15
         canvas_obj.setFont("Helvetica-Bold", 9)
-        canvas_obj.drawString(25 + offset, y_total, f"GRAND TOTAL: Rs. {grand_total:.2f}/-")
+        canvas_obj.drawString(25 + offset, y_total, f"GRAND TOTAL: Rs. {grand_total:.2f}//-")
         try:
             words = num2words(int(grand_total)).upper() + " ONLY"
             canvas_obj.setFont("Helvetica-Oblique", 6.5)
@@ -306,7 +266,6 @@ def generate_challana_pdf(bill_no, bill_date, final_jurisdiction, cust_name, fin
         
         canvas_obj.setFont("Helvetica-Bold", 8)
         canvas_obj.drawRightString(395 + offset, y_total - 25, f"For {current_user.get('Shop_Name', 'RS ELECTRONIC STORE')}")
-        
         if user_sign_path and os.path.exists(user_sign_path):
             try: canvas_obj.drawImage(user_sign_path, 310 + offset, y_total - 52, width=70, height=25, mask='auto')
             except: pass
