@@ -11,7 +11,7 @@ def render_smart_input(label, options_list, key_prefix):
     """
     పక్కపక్కనే (Side-by-Side) ఉండేలా డిజైన్ చేసిన సిస్టమ్:
     - ఎడమవైపు: మెయిన్ డేటా ఎంట్రీ బాక్స్ 
-    - ఢుడివైపు: చిన్న సెలెクション డౌన్ ఆరో బటన్ (▼)
+    - కుడివైపు: చిన్న సెలెクション డౌన్ ఆరో బటన్ (▼)
     """
     clean_opts = sorted(list(set([str(x).strip().upper() for x in options_list if x])))
     txt_key = f"txt_{key_prefix}"
@@ -20,22 +20,17 @@ def render_smart_input(label, options_list, key_prefix):
     if txt_key not in st.session_state: st.session_state[txt_key] = ""
     if sel_key not in st.session_state: st.session_state[sel_key] = "▼"
         
-    # డ్రాప్‌డౌన్ లో పాత రికార్డు ఎంచుకున్నప్పుడు ఎడమపక్క బాక్స్ ని అప్‌డేట్ చేసే ఫంక్షన్
     def sync_drop_to_text():
         selected = st.session_state[sel_key]
         if selected and selected != "▼":
             st.session_state[txt_key] = selected
 
-    # పైభాగంలో లేబుల్
     st.markdown(f"<p style='margin-bottom: -5px; font-weight: bold; font-size: 14px;'>{label}</p>", unsafe_allow_html=True)
-    
-    # ఎడమపక్క బాక్స్ మరియు కుడిపక్క ఆరో బటన్ కోసం రేషియో
     col_txt, col_sel = st.columns([3.8, 1.2])
     
     with col_sel:
         st.selectbox("Dropdown", ["▼"] + clean_opts, key=sel_key, on_change=sync_drop_to_text, label_visibility="collapsed")
     with col_txt:
-        # 🎯 [FIXED]: "Input" బదులు f"Input_{key_prefix}" ఇవ్వడం వల్ల డూప్లికేట్ ఎలిమెంట్ ఐడి ఎర్రర్ రాదు!
         final_val = st.text_input(f"Input_{key_prefix}", value=st.session_state[txt_key], label_visibility="collapsed").strip().upper()
         st.session_state[txt_key] = final_val
         
@@ -60,7 +55,6 @@ def show_billing_dashboard(current_user):
         if key not in st.session_state: 
             st.session_state[key] = value
 
-    # చల్లానా సేవ్ అయ్యాక వివరాలన్నీ క్లియర్ అవుతాయి
     if st.session_state.clear_all_fields:
         if st.session_state.bill_no.isdigit():
             st.session_state.bill_no = str(int(st.session_state.bill_no) + 1)
@@ -88,7 +82,6 @@ def show_billing_dashboard(current_user):
         "⚙️ SHOP SETTINGS"
     ])
 
-    # ---- ఆటోసజెషన్ డేటాబేస్ లోడ్ చేయడం ----
     sug = load_json(AUTOSUGGEST_FILE, {
         "jurisdictions": ["GUNTUR", "TENALI"],
         "trades": ["KIRANA STORE", "GOLD SHOP", "FERTILIZER"],
@@ -128,7 +121,6 @@ def show_billing_dashboard(current_user):
                 )
             st.divider()
 
-        # లాస్ట్ బిల్ నెంబర్ కనుక్కోవడం మరియు నెక్స్ట్ బిల్ నెంబర్ సెట్ చేయడం
         history_records = load_json(HISTORY_FILE, [])
         user_bill_numbers = [int(r.get('bill_no', 0)) for r in history_records if r.get('username') == current_user.get('Username') if str(r.get('bill_no', '')).isdigit()]
         
@@ -147,7 +139,6 @@ def show_billing_dashboard(current_user):
             manual_mode = st.checkbox("Manual Mode (Skip PDF)", key="manual_mode_checkbox")
             st.markdown(f"📊 **Last Bill No:** `{last_bill_no}`")
 
-        # మాన్యువల్ మోడ్ ఆన్‌లో ఉన్నప్పుడు క్విక్ బటన్ లాజిక్
         if manual_mode:
             if st.button("🔄 Use Present Running Bill No & Date", use_container_width=True, type="secondary"):
                 st.session_state.bill_no = next_regular_bill
@@ -162,20 +153,15 @@ def show_billing_dashboard(current_user):
             st.session_state.cust_pro = st.text_input("Proprietor Name", value=st.session_state.cust_pro).upper()
         with col_c2:
             st.session_state.cust_area = st.text_input("Area / Landmark", value=st.session_state.cust_area).upper()
-            
-            # Jurisdiction, Trade Type
             final_jurisdiction = render_smart_input("Jurisdiction", sug.get("jurisdictions", []), "jur")
             final_trade = render_smart_input("Trade Type", sug.get("trades", []), "trd")
 
-        # Town, Village, Pincode
         col_b = st.columns(3)
         with col_b[0]: final_town = render_smart_input("Town", sug.get("towns", []), "twn")
         with col_b[1]: final_vlg = render_smart_input("Village", sug.get("villages", []), "vlg")
         with col_b[2]: final_pin = render_smart_input("Pincode", sug.get("pins", []), "pin")
 
         st.markdown("#### ⚖️ Weighing Scale Specifications")
-        
-        # కాటా స్పెసిఫికేషన్స్
         col_i1, col_i2, col_i3 = st.columns(3)
         with col_i1:
             final_make = render_smart_input("Make", sug.get("makes", []), "mk")
@@ -192,10 +178,8 @@ def show_billing_dashboard(current_user):
         with col_fee2: item_cc = st.number_input("CC Fee", min_value=0, value=50)
         with col_fee3: item_new = st.number_input("New Fee (Sistu)", min_value=0, value=0)
         
-        # M/C No
         final_mc = render_smart_input("Machine Serial No (M/C NO)", sug.get("mc_nos", []), "mc")
 
-        # ---- ఐటెమ్ యాడ్ బటన్ రన్ లాజిక్ ----
         if st.button("➕ ADD ITEM TO CHALLANA LIST", use_container_width=True, type="secondary"):
             if not final_make or not final_model:
                 st.error("❌ దయచేసి కనీసం Make మరియు Model వివరాలను టైప్ లేదా సెలెక్ట్ చేయండి!")
@@ -213,11 +197,9 @@ def show_billing_dashboard(current_user):
                     "stamping": str(item_stamping), "cc": str(item_cc), "new": str(item_new), 
                     "total": (item_stamping + item_cc + item_new)
                 })
-                
                 st.session_state.item_added_success = True
                 st.rerun()
 
-        # యాడ్ చేసిన ఐటెమ్స్ టేబుల్ ప్రదర్శన
         if st.session_state.bill_items:
             st.markdown("##### 📋 Current Added Items:")
             for idx, item in enumerate(st.session_state.bill_items):
@@ -229,7 +211,6 @@ def show_billing_dashboard(current_user):
 
         st.divider()
         
-        # ---- చల్లానా సేవ్ చేసి బిల్ క్రియేట్ చేయడం ----
         if st.button("💾 GENERATE & SAVE CHALLANA", type="primary", use_container_width=True):
             if not st.session_state.cust_name: 
                 st.error("❌ Please enter Customer Name!")
@@ -269,7 +250,79 @@ def show_billing_dashboard(current_user):
     with tab_history:
         show_history_log_section()
 
-    # ---- ⚙️ ట్యాబ్ 3: సెట్టింగ్స్ ----
+    # ---- ⚙️ ట్యాబ్ 3: SHOP SETTINGS (ADDED UPLOAD FEATURE) ----
     with tab_settings:
-        st.markdown("### 🏪 Shop Settings")
-        st.info("💡 ఇక్కడ మీ లోగో మరియు సంతకం మేనేజ్ చేసుకోవచ్చు.")
+        st.markdown("### 🏪 Shop Settings & Assets")
+        username = current_user.get('Username', '').strip()
+        
+        # --- 1. SHOP LOGO SECTION ---
+        st.markdown("---")
+        st.markdown("#### 🖼️ Shop Logo Management")
+        
+        # అప్పటికే ఉన్న లోగోను చెక్ చేయడం
+        logo_path = None
+        for ext in ['.png', '.jpg', '.jpeg', '.PNG', '.JPG', '.JPEG']:
+            p = os.path.join(BASE_DIR, f"{username}_logo{ext}")
+            if os.path.exists(p):
+                logo_path = p
+                break
+        
+        if logo_path:
+            st.image(logo_path, caption="ప్రస్తుత షాప్ లోగో (Current Logo)", width=130)
+            if st.button("🗑️ Delete Existing Logo", key="del_logo_btn", type="secondary"):
+                os.remove(logo_path)
+                st.success("షాప్ లోగో విజయవంతంగా డిలీట్ చేయబడింది!")
+                st.rerun()
+        else:
+            st.info("ప్రస్తుతం ఎటువంటి లోగో అప్‌లోడ్ చేయబడలేదు. (PDF లో ఖాళీగా వస్తుంది)")
+            
+        uploaded_logo = st.file_uploader("Upload New Logo (PNG / JPG)", type=["png", "jpg", "jpeg"], key="logo_uploader")
+        if uploaded_logo is not None:
+            # పాత ఫైల్స్ ఏవైనా ఉంటే క్లీన్ చేయడం
+            for ext in ['.png', '.jpg', '.jpeg', '.PNG', '.JPG', '.JPEG']:
+                p = os.path.join(BASE_DIR, f"{username}_logo{ext}")
+                if os.path.exists(p): os.remove(p)
+                
+            # కొత్త ఫైల్ సేవ్ చేయడం
+            file_ext = os.path.splitext(uploaded_logo.name)[1]
+            new_logo_path = os.path.join(BASE_DIR, f"{username}_logo{file_ext}")
+            with open(new_logo_path, "wb") as f:
+                f.write(uploaded_logo.getbuffer())
+            st.success("🎉 షాప్ లోగో విజయవంతంగా అప్‌డేట్ చేయబడింది!")
+            st.rerun()
+
+        # --- 2. SIGNATURE SECTION ---
+        st.markdown("---")
+        st.markdown("#### ✍️ Authorized Signature Management")
+        
+        # అప్పటికే ఉన్న సంతకం చెక్ చేయడం
+        sign_path = None
+        for ext in ['.png', '.jpg', '.jpeg', '.PNG', '.JPG', '.JPEG']:
+            p = os.path.join(BASE_DIR, f"{username}_sign{ext}")
+            if os.path.exists(p):
+                sign_path = p
+                break
+                
+        if sign_path:
+            st.image(sign_path, caption="ప్రస్తుత సంతకం (Current Signature)", width=150)
+            if st.button("🗑️ Delete Existing Signature", key="del_sign_btn", type="secondary"):
+                os.remove(sign_path)
+                st.success("సంతకం ఇమేజ్ విజయవంతంగా డిలీట్ చేయబడింది!")
+                st.rerun()
+        else:
+            st.info("ప్రస్తుతం ఎటువంటి సంతకం ఇమేజ్ అప్‌లోడ్ చేయబడలేదు.")
+            
+        uploaded_sign = st.file_uploader("Upload New Signature (PNG / JPG)", type=["png", "jpg", "jpeg"], key="sign_uploader")
+        if uploaded_sign is not None:
+            # పాత సంతకం ఫైల్స్ క్లీన్ చేయడం
+            for ext in ['.png', '.jpg', '.jpeg', '.PNG', '.JPG', '.JPEG']:
+                p = os.path.join(BASE_DIR, f"{username}_sign{ext}")
+                if os.path.exists(p): os.remove(p)
+                
+            # కొత్త సంతకం సేవ్ చేయడం
+            file_ext = os.path.splitext(uploaded_sign.name)[1]
+            new_sign_path = os.path.join(BASE_DIR, f"{username}_sign{file_ext}")
+            with open(new_sign_path, "wb") as f:
+                f.write(uploaded_sign.getbuffer())
+            st.success("🎉 సంతకం ఇమేజ్ విజయవంతంగా అప్‌డేట్ చేయబడింది!")
+            st.rerun()
