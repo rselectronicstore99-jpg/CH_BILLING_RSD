@@ -35,7 +35,8 @@ def render_smart_input(label, options_list, key_prefix):
     with col_sel:
         st.selectbox("Dropdown", ["▼"] + clean_opts, key=sel_key, on_change=sync_drop_to_text, label_visibility="collapsed")
     with col_txt:
-        final_val = st.text_input("Input", key=txt_key, label_visibility="collapsed").strip().upper()
+        final_val = st.text_input("Input", value=st.session_state[txt_key], label_visibility="collapsed").strip().upper()
+        st.session_state[txt_key] = final_val
         
     return final_val
 
@@ -126,7 +127,7 @@ def show_billing_dashboard(current_user):
                 )
             st.divider()
 
-        # 🎯 [🎯 NEW LOGIC]: లాస్ట్ బిల్ నెంబర్ కనుక్కోవడం మరియు నెక్స్ట్ బిల్ నెంబర్ సెట్ చేయడం
+        # లాస్ట్ బిల్ నెంబర్ కనుక్కోవడం మరియు నెక్స్ట్ బిల్ నెంబర్ సెట్ చేయడం
         history_records = load_json(HISTORY_FILE, [])
         user_bill_numbers = [int(r.get('bill_no', 0)) for r in history_records if r.get('username') == current_user.get('Username') if str(r.get('bill_no', '')).isdigit()]
         
@@ -136,18 +137,17 @@ def show_billing_dashboard(current_user):
         if not st.session_state.bill_no: 
             st.session_state.bill_no = next_regular_bill
 
-        # 🎯 [🎯 UI UPDATE]: మీ ఐడియా ప్రకారం డిజైన్ మార్చబడింది
+        # 🎯 [CORRECTED]: key బదులు value పద్ధతి వాడటం వల్ల ఎర్రర్ రాదు, వాల్యూస్ ఈజీగా మారుతాయి
         col_t1, col_t2, col_t3 = st.columns(3)
         with col_t1: 
-            st.text_input("Bill No *", key="bill_no")
+            st.session_state.bill_no = st.text_input("Bill No *", value=st.session_state.bill_no)
         with col_t2: 
-            st.text_input("Date *", key="manual_date")
+            st.session_state.manual_date = st.text_input("Date *", value=st.session_state.manual_date)
         with col_t3: 
             manual_mode = st.checkbox("Manual Mode (Skip PDF)", key="manual_mode_checkbox")
-            # లాస్ట్ బిల్ నెంబర్ ఎల్లప్పుడూ స్క్రీన్ పై ఇక్కడ కనిపిస్తుంది
             st.markdown(f"📊 **Last Bill No:** `{last_bill_no}`")
 
-        # 🎯 [🎯 NEW QUICK BUTTON]: మాన్యువల్ మోడ్ ఆన్‌లో ఉన్నప్పుడు కింద కనిపించే కంటిన్యూ బటన్
+        # మాన్యువల్ మోడ్ ఆన్‌లో ఉన్నప్పుడు క్విక్ బటన్ లాజిక్
         if manual_mode:
             if st.button("🔄 Use Present Running Bill No & Date", use_container_width=True, type="secondary"):
                 st.session_state.bill_no = next_regular_bill
