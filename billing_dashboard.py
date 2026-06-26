@@ -99,6 +99,18 @@ def show_billing_dashboard(current_user):
 
     # ---- 🧾 ట్యాబ్ 1: చల్లానా జనరేటర్ ----
     with tab_create:
+        
+        # లాగిన్ అయిన యూజర్ యొక్క షాప్ పేరు (ఒకవేళ లేకపోతే యూజర్ నేమ్ చూపిస్తుంది)
+        shop_name = current_user.get('Shop_Name', current_user.get('Username', 'MY BILLING SHOP')).upper()
+        
+        # 🌟 షాప్ పేరు బిగ్ & బోల్డ్ మరియు వెల్కమ్ మెసేజ్ స్టైలిష్ డిజైన్
+        st.markdown(f"""
+            <div style='text-align: center; margin-bottom: 25px; padding: 15px; border-radius: 10px; background-color: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1);'>
+                <h1 style='margin: 0; font-size: 36px; font-weight: 900; color: #00D2FF; letter-spacing: 1px;'>🏢 {shop_name}</h1>
+                <p style='margin: 8px 0 0 0; font-size: 16px; font-style: italic; color: #aaaaaa;'>✨ Welcome to Challana Generator Dashboard ✨</p>
+            </div>
+        """, unsafe_allow_html=True)
+
         st.subheader("Challana Generator")
         
         if st.session_state.item_added_success:
