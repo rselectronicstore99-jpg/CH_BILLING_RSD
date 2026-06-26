@@ -11,7 +11,7 @@ def render_smart_input(label, options_list, key_prefix):
     """
     పక్కపక్కనే (Side-by-Side) ఉండేలా డిజైన్ చేసిన సిస్టమ్:
     - ఎడమవైపు: మెయిన్ డేటా ఎంట్రీ బాక్స్ 
-    - కుడివైపు: చిన్న సెలెクション డౌన్ ఆరో బటన్ (▼)
+    - ఢుడివైపు: చిన్న సెలెクション డౌన్ ఆరో బటన్ (▼)
     """
     clean_opts = sorted(list(set([str(x).strip().upper() for x in options_list if x])))
     txt_key = f"txt_{key_prefix}"
@@ -35,7 +35,8 @@ def render_smart_input(label, options_list, key_prefix):
     with col_sel:
         st.selectbox("Dropdown", ["▼"] + clean_opts, key=sel_key, on_change=sync_drop_to_text, label_visibility="collapsed")
     with col_txt:
-        final_val = st.text_input("Input", value=st.session_state[txt_key], label_visibility="collapsed").strip().upper()
+        # 🎯 [FIXED]: "Input" బదులు f"Input_{key_prefix}" ఇవ్వడం వల్ల డూప్లికేట్ ఎలిమెంట్ ఐడి ఎర్రర్ రాదు!
+        final_val = st.text_input(f"Input_{key_prefix}", value=st.session_state[txt_key], label_visibility="collapsed").strip().upper()
         st.session_state[txt_key] = final_val
         
     return final_val
@@ -137,7 +138,6 @@ def show_billing_dashboard(current_user):
         if not st.session_state.bill_no: 
             st.session_state.bill_no = next_regular_bill
 
-        # 🎯 [CORRECTED]: key బదులు value పద్ధతి వాడటం వల్ల ఎర్రర్ రాదు, వాల్యూస్ ఈజీగా మారుతాయి
         col_t1, col_t2, col_t3 = st.columns(3)
         with col_t1: 
             st.session_state.bill_no = st.text_input("Bill No *", value=st.session_state.bill_no)
