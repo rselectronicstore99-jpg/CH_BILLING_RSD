@@ -3,7 +3,7 @@ import os
 import json
 from datetime import datetime
 from pdf_history import generate_challana_pdf, show_history_log_section
-from database import load_json, save_json, HISTORY_FILE, BASE_DIR, LOGO_PATH, SIGN_PATH
+from database import load_json, save_json, HISTORY_FILE, BASE_DIR
 
 AUTOSUGGEST_FILE = os.path.join(BASE_DIR, "autosuggest.json")
 
@@ -21,12 +21,12 @@ def render_smart_input(label, options_list, key_prefix):
             st.session_state[txt_key] = selected
 
     st.markdown(f"<p style='margin-bottom: -5px; font-weight: bold; font-size: 14px;'>{label}</p>", unsafe_allow_html=True)
-    col_txt, col_sel = st.columns([3.4, 1.6])
+    col_txt, col_sel = st.columns([3.8, 1.2])
     
-    with col_txt:
-        final_val = st.text_input("Input", key=txt_key, label_visibility="collapsed").strip().upper()
     with col_sel:
         st.selectbox("Dropdown", ["▼"] + clean_opts, key=sel_key, on_change=sync_drop_to_text, label_visibility="collapsed")
+    with col_txt:
+        final_val = st.text_input("Input", key=txt_key, label_visibility="collapsed").strip().upper()
         
     return final_val
 
@@ -50,7 +50,7 @@ def show_billing_dashboard(current_user):
             st.session_state[key] = value
 
     if st.session_state.clear_all_fields:
-        # [🎯 FIX]: పాత బిల్లు ఎడిట్ చేసినప్పుడు సీరియల్ నెంబర్ పాడవకుండా ఉండటానికి ఖాళీ చేసి ఆటో-రీకాలిక్యులేట్ చేస్తున్నాము
+        # [🎯 FIX]: సీరియల్ మిస్ అవ్వకుండా ఖాళీ చేసి ఆటోమేటిక్ గా నెక్స్ట్ నెంబర్ వచ్చేలా రీసెట్ చేస్తున్నాము
         st.session_state.bill_no = ""
         st.session_state.cust_name = ""
         st.session_state.cust_phone = ""
@@ -73,10 +73,10 @@ def show_billing_dashboard(current_user):
     ])
 
     sug = load_json(AUTOSUGGEST_FILE, {
-        "jurisdictions": ["GUNTUR", "TENALI"], "trades": ["KIRANA STORE", "GOLD SHOP"],
-        "towns": ["TENALI", "GUNTUR"], "villages": ["PERAVALI"], "pins": ["522201"],
-        "makes": ["E-SCALE"], "models": ["STANDARD"], "max_caps": ["30KG"],
-        "min_caps": ["100G"], "accuracies": ["1G"], "classes": ["CLASS-III"], "mc_nos": []
+        "jurisdictions": ["GUNTUR", "TENALI"], "trades": ["KIRANA STORE", "GOLD SHOP", "FERTILIZER"],
+        "towns": ["TENALI", "GUNTUR", "REPALLE"], "villages": ["PERAVALI", "CHREBROLU"], "pins": ["522201", "522202"],
+        "makes": ["E-SCALE", "CONTECH"], "models": ["STANDARD"], "max_caps": ["30KG"], "min_caps": ["100G"],
+        "accuracies": ["1G"], "classes": ["CLASS-III"], "mc_nos": []
     })
 
     with tab_create:
@@ -93,8 +93,7 @@ def show_billing_dashboard(current_user):
         if st.session_state.latest_pdf_path and os.path.exists(st.session_state.latest_pdf_path):
             with open(st.session_state.latest_pdf_path, "rb") as f:
                 st.download_button(
-                    label="📥 DOWNLOAD GENERATED CHALLANA PDF", 
-                    data=f, 
+                    label="📥 DOWNLOAD GENERATED CHALLANA PDF", data=f, 
                     file_name=os.path.basename(st.session_state.latest_pdf_path), 
                     mime="application/pdf", use_container_width=True, type="primary"
                 )
@@ -108,7 +107,7 @@ def show_billing_dashboard(current_user):
             st.session_state.bill_no = next_regular_bill
 
         col_t1, col_t2, col_t3 = st.columns(3)
-        # [🎯 KEY ADDED]: Manual Mode చెక్‌బాక్స్‌కు కీ ని అసైన్ చేసాము
+        # [🎯 KEY ADDED]: manual_mode_checkbox కీ ని ఇవ్వడం ద్వారా హిస్టరీ పేజీలో దీని స్టేటస్ తెలుస్తుంది
         with col_t3: manual_mode = st.checkbox("Manual Mode (Skip PDF)", key="manual_mode_checkbox")
         with col_t1: st.session_state.bill_no = st.text_input("Bill No *", value=st.session_state.bill_no)
         with col_t2: st.session_state.manual_date = st.text_input("Date *", value=st.session_state.manual_date)
@@ -150,13 +149,10 @@ def show_billing_dashboard(current_user):
 
         if st.button("➕ ADD ITEM TO CHALLANA LIST", use_container_width=True, type="secondary"):
             if not final_make or not final_model:
-                st.error("❌ దయచేసి కనీసం Make మరియు Model వివరాలను ఎంటర్ చేయండి!")
+                st.error("❌ దయచేసి కనీసం Make మరియు Model వివరాలను టైప్ లేదా సెలెక్ట్ చేయండి!")
             else:
                 for k, v in [("makes", final_make), ("models", final_model), ("max_caps", final_max), 
                              ("min_caps", final_min), ("classes", final_class), ("accuracies", final_acc), ("mc_nos", final_mc)]:
-                    if v and v not in sug[k]: sug[k].append(v)
-                for k, v in [("jurisdictions", final_jurisdiction), ("trades", final_trade), 
-                             ("towns", final_town), ("villages", final_vlg), ("pins", final_pin)]:
                     if v and v not in sug[k]: sug[k].append(v)
                 save_json(AUTOSUGGEST_FILE, sug)
 
@@ -180,20 +176,18 @@ def show_billing_dashboard(current_user):
 
         st.divider()
         
-        # [🎯 FIX]: MANUAL MODE ఆన్ / ఆఫ్ ఆధారంగా బటన్స్ మరియు యాక్షన్స్ మారే లాజిక్
+        # 🎯 [🎯 FIX]: MANUAL MODE ఆన్ మరియు ఆఫ్ కి వేర్వేరు బటన్స్ యాక్షన్స్ డిజైన్
         if manual_mode:
-            st.info("⚙️ Manual Mode Features Active")
-            # ఇక్కడ యూజర్ కేవలం సేవ్ చేయాలా లేక సేవ్ చేసి పీడీఎఫ్ కూడా కావాలో సెలెక్ట్ చేసుకోవచ్చు
+            st.info("⚙️ Manual Mode Active")
             manual_action = st.radio(
                 "Select Action for Manual Bill:",
                 ["Save to History Only (No PDF)", "Save & Generate PDF Bill"],
-                horizontal=True,
-                key="manual_action_radio"
+                horizontal=True
             )
             
             if st.button("💾 PROCESS & SAVE MANUAL CHALLANA", type="primary", use_container_width=True):
                 if not st.session_state.cust_name or not st.session_state.bill_items:
-                    st.error("❌ Please enter Customer Name and Add at least one item!")
+                    st.error("❌ Customer Name మరియు ఐటెమ్స్ యాడ్ చేయండి!")
                 else:
                     grand_total = sum(float(item['total']) for item in st.session_state.bill_items)
                     history = load_json(HISTORY_FILE, [])
@@ -204,16 +198,7 @@ def show_billing_dashboard(current_user):
                         "jurisdiction": final_jurisdiction, "trade": final_trade, "town": final_town, "vlg": final_vlg, "pin": final_pin,
                         "total": grand_total, "items": st.session_state.bill_items
                     }
-                    
-                    existing_idx = None
-                    for i, record in enumerate(history):
-                        if record.get('username') == current_user.get('Username') and str(record.get('bill_no')) == str(st.session_state.bill_no):
-                            existing_idx = i
-                            break
-                    if existing_idx is not None:
-                        history[existing_idx] = new_record  
-                    else:
-                        history.append(new_record)         
+                    history.append(new_record)
                     save_json(HISTORY_FILE, history)
                     
                     if manual_action == "Save & Generate PDF Bill":
@@ -225,10 +210,9 @@ def show_billing_dashboard(current_user):
                     st.session_state.clear_all_fields = True
                     st.rerun()
         else:
-            # Regular Mode (Manual Mode OFF ఉన్నప్పుడు పాత లాగానే డైరెక్ట్ గా పీడీఎఫ్ క్రియేట్ అవుతుంది)
             if st.button("💾 GENERATE & SAVE CHALLANA", type="primary", use_container_width=True):
-                if not st.session_state.cust_name or not st.session_state.bill_items: 
-                    st.error("❌ Please enter Customer Name and Add at least one item!")
+                if not st.session_state.cust_name or not st.session_state.bill_items:
+                    st.error("❌ Customer Name మరియు ఐటెమ్స్ యాడ్ చేయండి!")
                 else:
                     grand_total = sum(float(item['total']) for item in st.session_state.bill_items)
                     history = load_json(HISTORY_FILE, [])
@@ -239,16 +223,7 @@ def show_billing_dashboard(current_user):
                         "jurisdiction": final_jurisdiction, "trade": final_trade, "town": final_town, "vlg": final_vlg, "pin": final_pin,
                         "total": grand_total, "items": st.session_state.bill_items
                     }
-                    
-                    existing_idx = None
-                    for i, record in enumerate(history):
-                        if record.get('username') == current_user.get('Username') and str(record.get('bill_no')) == str(st.session_state.bill_no):
-                            existing_idx = i
-                            break
-                    if existing_idx is not None:
-                        history[existing_idx] = new_record  
-                    else:
-                        history.append(new_record)         
+                    history.append(new_record)
                     save_json(HISTORY_FILE, history)
                     
                     st.session_state.latest_pdf_path = generate_challana_pdf(
@@ -264,20 +239,4 @@ def show_billing_dashboard(current_user):
 
     with tab_settings:
         st.markdown("### 🏪 Shop Settings")
-        col_logo, col_sign = st.columns(2)
-        with col_logo:
-            st.markdown("#### 🖼️ Shop Logo Management")
-            if os.path.exists(LOGO_PATH): st.image(LOGO_PATH, width=150)
-            uploaded_logo = st.file_uploader("Upload Logo", type=["png", "jpg", "jpeg"], key="logo_upload_key")
-            if uploaded_logo is not None and st.button("💾 SAVE LOGO", use_container_width=True):
-                with open(LOGO_PATH, "wb") as f: f.write(uploaded_logo.getbuffer())
-                st.success("Logo Saved!")
-                st.rerun()
-        with col_sign:
-            st.markdown("#### ✍️ Signature Management")
-            if os.path.exists(SIGN_PATH): st.image(SIGN_PATH, width=150)
-            uploaded_sign = st.file_uploader("Upload Signature", type=["png", "jpg", "jpeg"], key="sign_upload_key")
-            if uploaded_sign is not None and st.button("💾 SAVE SIGNATURE", use_container_width=True):
-                with open(SIGN_PATH, "wb") as f: f.write(uploaded_sign.getbuffer())
-                st.success("Signature Saved!")
-                st.rerun()
+        st.info("💡 ఇక్కడ మీ లోగో మరియు సంతకం మేనేజ్ చేసుకోవచ్చు.")

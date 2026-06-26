@@ -23,7 +23,7 @@ def show_history_log_section():
     history_records = load_json(HISTORY_FILE, [])
     
     if not history_records:
-        st.info("ఈ ఆర్థిక సంవత్సరానికి ఎటువంటి హిస్టరీ డేటా రിക്കార్డ్ అవ్వలేదు.")
+        st.info("ఈ ఆర్థిక సంవత్సరానికి ఎటువంటి హిస్టరీ డేటా రికార్డ్ అవ్వలేదు.")
         return
 
     alert_templates = [
@@ -42,8 +42,8 @@ def show_history_log_section():
         if parsed_dates: default_start_date = min(parsed_dates)
 
     col_d1, col_d2 = st.columns(2)
-    with col_d1: start_date = st.date_input("From Date", value=default_start_date)
-    with col_d2: end_date = st.date_input("To Date", value=datetime.now().date())
+    with col_d1: start_date = st.date_input("From Date (నుండి)", value=default_start_date)
+    with col_d2: end_date = st.date_input("To Date (వరకు)", value=datetime.now().date())
         
     col_s1, col_s2, col_s3 = st.columns(3)
     with col_s1: search_name = st.text_input("👤 Search Customer Name").strip().upper()
@@ -70,7 +70,7 @@ def show_history_log_section():
     with tab1:
         for idx, record in enumerate(reversed(filtered_records)):
             with st.expander(f"🧾 Bill: {record.get('bill_no')} | {record.get('date')} | {record.get('name')} | ₹{record.get('total')}/-"):
-                st.write(f"📍 **Address:** {record.get('town')}, {record.get('vlg')} | 📞 **Phone:** {record.get('phone')}")
+                st.write(f"📍 **Address:** {record.get('town')}, {record.get('vlg')} ({record.get('pin')}) | 📞 **Phone:** {record.get('phone')}")
                 st.table(record.get('items', []))
                 
                 chosen_template = st.selectbox("Select Alert Message", alert_templates, key=f"tpl_{idx}")
@@ -80,32 +80,36 @@ def show_history_log_section():
                 with col_b1:
                     if st.button("📥 IMPORT THIS DATA TO MAIN GUI", key=f"imp_{idx}", type="primary", use_container_width=True):
                         
-                        # [🎯 CRITICAL FIX]: చెక్‌బాక్స్ ఆన్ లో ఉందా లేదా అని చెక్ చేసే కండిషన్
-                        is_manual_on = st.session_state.get("manual_mode_checkbox", False)
+                        # 🎯 [🎯 FIX]: Manual Mode ఆన్ లో ఉందో లేదో ఇక్కడ చెక్ చేస్తున్నాము
+                        is_manual_mode_on = st.session_state.get("manual_mode_checkbox", False)
                         
-                        if is_manual_on:
-                            # Manual Mode ON లో ఉంటే: పాత బిల్ నెంబర్ మరియు పాత డేట్ కూడా ఇంపోర్ట్ అవుతాయి
+                        if is_manual_mode_on:
+                            # Manual Mode ON లో ఉంటే పాత బిల్ నెంబర్ మరియు పాత డేట్ వస్తాయి
                             st.session_state.bill_no = record.get('bill_no', '')
                             st.session_state.manual_date = record.get('date', '')
                         else:
-                            # Manual Mode OFF లో ఉంటే: పాత బిల్ నెంబర్, డేట్ రావు (ప్రస్తుత రన్నింగ్ సీరియల్స్ అలాగే ఉంటాయి)
-                            pass
+                            # Manual Mode OFF లో ఉంటే పాత వివరాలు రావు, రన్నింగ్ సీరియల్ కి రీసెట్ అవుతుంది
+                            st.session_state.bill_no = "" 
+                            st.session_state.manual_date = datetime.now().strftime('%d-%m-%Y')
                         
-                        # మిగిలిన కస్టమర్ మరియు కాటా వివరాలు ఎప్పుడూ ఇంపోర్ట్ అవుతాయి
+                        # మిగిలిన కస్టమర్ వివరాలు ఎప్పుడూ ఇంపోర్ట్ అవుతాయి
                         st.session_state.cust_name = record.get('name', '')
                         st.session_state.cust_phone = record.get('phone', '')
                         st.session_state.cust_pro = record.get('pro', '')
                         st.session_state.cust_area = record.get('area', '')
                         st.session_state.bill_items = record.get('items', [])
                         
+                        # లొకేషన్ బాక్సుల అప్‌డేట్
                         st.session_state.txt_jur = record.get('jurisdiction', '')
                         st.session_state.txt_trd = record.get('trade', '')
                         st.session_state.txt_twn = record.get('town', '')
                         st.session_state.txt_vlg = record.get('vlg', '')
                         st.session_state.txt_pin = record.get('pin', '')
                         
-                        if record.get('items') and len(record.get('items')) > 0:
-                            first_item = record.get('items')[0]
+                        # కాటా స్పెసిఫికేషన్ వివరాలు కూడా మెయిన్ స్క్రీన్ బాక్సుల్లోకి ఇంపోర్ట్ అవ్వడానికి లాజిక్
+                        items_list = record.get('items', [])
+                        if items_list:
+                            first_item = items_list[0]
                             st.session_state.txt_mk = first_item.get('make', '')
                             st.session_state.txt_md = first_item.get('model', '')
                             st.session_state.txt_mx = first_item.get('max', '')
@@ -123,6 +127,7 @@ def show_history_log_section():
                     st.link_button("📲 SEND WHATSAPP REMINDER", wa_url, use_container_width=True)
 
     with tab2:
+        st.markdown("#### ⚡ Fast WhatsApp Reminder Panel")
         global_template = st.selectbox("Select Message Template for List", alert_templates, key="global_wa_tpl")
         for idx, record in enumerate(reversed(filtered_records)):
             col1, col2, col3, col4, col5 = st.columns([1.2, 2.5, 1.5, 1.5, 1.5])
@@ -141,8 +146,21 @@ def generate_challana_pdf(bill_no, bill_date, final_jurisdiction, cust_name, fin
     canvas_obj.line(421, 15, 421, 580)
     
     username = current_user.get('Username', '').strip()
-    user_logo_path = os.path.join(BASE_DIR, f"{username}_logo.png") if username else None
-    user_sign_path = os.path.join(BASE_DIR, f"{username}_sign.png") if username else None
+    user_logo_path = None
+    if username:
+        for ext in ['.png', '.jpg', '.jpeg', '.PNG', '.JPG', '.JPEG']:
+            p = os.path.join(BASE_DIR, f"{username}_logo{ext}")
+            if os.path.exists(p):
+                user_logo_path = p
+                break
+
+    user_sign_path = None
+    if username:
+        for ext in ['.png', '.jpg', '.jpeg', '.PNG', '.JPG', '.JPEG']:
+            p = os.path.join(BASE_DIR, f"{username}_sign{ext}")
+            if os.path.exists(p):
+                user_sign_path = p
+                break
     
     for offset in [0, 421]:
         canvas_obj.setLineWidth(1.2)
@@ -237,9 +255,11 @@ def generate_challana_pdf(bill_no, bill_date, final_jurisdiction, cust_name, fin
                 draw_cell_text(canvas_obj, item.get('class', ''), cols_x[6]+3, text_y, col_widths[6]-4, font_size=7.5)
                 
                 mc_text = str(item.get('mc_no', ''))
-                mc_lines = [mc_text[i:i+12].strip() for i in range(0, len(mc_text), 12)][:3]
+                if ',' in mc_text: mc_lines = [line.strip() for line in mc_text.split(',')]
+                else: mc_lines = [mc_text[i:i+12].strip() for i in range(0, len(mc_text), 12)]
+                mc_lines = [l for l in mc_lines if l][:3]
                 for m_idx, line_text in enumerate(mc_lines):
-                    canvas_obj.drawString(cols_x[7]+3, current_row_top - 6.5 - (m_idx * 8.5), line_text)
+                    draw_cell_text(canvas_obj, line_text, cols_x[7]+3, current_row_top - 6.5 - (m_idx * 8.5), col_widths[7]-4, font_size=7)
                     
                 try: stamping_val = f"{float(item.get('stamping', 0)):.2f}"
                 except: stamping_val = "0.00"
@@ -257,7 +277,7 @@ def generate_challana_pdf(bill_no, bill_date, final_jurisdiction, cust_name, fin
                 
         y_total = header_bottom - (fixed_rows_count * row_height) - 15
         canvas_obj.setFont("Helvetica-Bold", 9)
-        canvas_obj.drawString(25 + offset, y_total, f"GRAND TOTAL: Rs. {grand_total:.2f}//-")
+        canvas_obj.drawString(25 + offset, y_total, f"GRAND TOTAL: Rs. {grand_total:.2f}/-")
         try:
             words = num2words(int(grand_total)).upper() + " ONLY"
             canvas_obj.setFont("Helvetica-Oblique", 6.5)
