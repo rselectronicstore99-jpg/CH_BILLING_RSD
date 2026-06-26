@@ -18,9 +18,60 @@ def draw_cell_text(canvas_obj, text, x, y, max_width, font_name="Helvetica-Bold"
         text = text[:-1]
     canvas_obj.drawString(x, y, text)
 
+# 🎯 [🎯 SAFE CALLBACK]: సెషన్ స్టేట్ వాల్యూస్ క్రాష్ అవ్వకుండా మార్చడానికి ఈ కాల్‌బ్యాక్ మాత్రమే వాడాలి
+def import_history_to_session_callback(record):
+    is_manual_mode_on = st.session_state.get("manual_mode_checkbox", False)
+    
+    if is_manual_mode_on:
+        # Manual Mode ఆన్ లో ఉంటే పాత రికార్డు లోని బిల్ నెంబర్, తేదీ వస్తాయి
+        st.session_state.bill_no = record.get('bill_no', '')
+        st.session_state.manual_date = record.get('date', '')
+    else:
+        # Manual Mode ఆఫ్ లో ఉంటే ఖాళీ అవుతుంది (ఆటోమేటిక్ గా రన్నింగ్ సీరియల్ నెంబర్ తీసుకుంటుంది)
+        st.session_state.bill_no = "" 
+        st.session_state.manual_date = datetime.now().strftime('%d-%m-%Y')
+    
+    # కస్టమర్ వివరాల ఇంపోర్ట్
+    st.session_state.cust_name = record.get('name', '')
+    st.session_state.cust_phone = record.get('phone', '')
+    st.session_state.cust_pro = record.get('pro', '')
+    st.session_state.cust_area = record.get('area', '')
+    st.session_state.bill_items = record.get('items', [])
+    
+    # లొకేషన్ బాక్సుల వివరాలు
+    st.session_state.txt_jur = record.get('jurisdiction', '')
+    st.session_state.txt_trd = record.get('trade', '')
+    st.session_state.txt_twn = record.get('town', '')
+    st.session_state.txt_vlg = record.get('vlg', '')
+    st.session_state.txt_pin = record.get('pin', '')
+    
+    # మొదటి ఐటెమ్ యొక్క స్పెసిఫికేషన్ వివరాలు
+    items_list = record.get('items', [])
+    if items_list:
+        first_item = items_list[0]
+        st.session_state.txt_mk = first_item.get('make', '')
+        st.session_state.txt_md = first_item.get('model', '')
+        st.session_state.txt_mx = first_item.get('max', '')
+        st.session_state.txt_mn = first_item.get('min', '')
+        st.session_state.txt_cls = first_item.get('class', '')
+        st.session_state.txt_ac = first_item.get('acc', '')
+        st.session_state.txt_mc = first_item.get('mc_no', '')
+    
+    for kp in ["jur", "trd", "twn", "vlg", "pin", "mk", "md", "mx", "mn", "cls", "ac", "mc"]:
+        st.session_state[f"sel_{kp}"] = "▼"
+        
+    # అలర్ట్ మెసేజ్ చూపించడానికి ట్రిగ్గర్ ఆన్
+    st.session_state.import_success_trigger = True
+
+
 def show_history_log_section():
     st.markdown("### 📅 Filter & Search History Logs")
     history_records = load_json(HISTORY_FILE, [])
+    
+    # డేటా సక్సెస్ ఫుల్ గా ఇంపోర్ట్ అయిందని చూపించే అలర్ట్
+    if st.session_state.get("import_success_trigger"):
+        st.success("🎉 డేటా విజయవంతంగా ఇంపోర్ట్ చేయబడింది! దయచేసి 'CREATE CHALLANA' ట్యాబ్ ఓపెన్ చేసి చూడండి.")
+        st.session_state.import_success_trigger = False
     
     if not history_records:
         st.info("ఈ ఆర్థిక సంవత్సరానికి ఎటువంటి హిస్టరీ డేటా రికార్డ్ అవ్వలేదు.")
@@ -42,8 +93,8 @@ def show_history_log_section():
         if parsed_dates: default_start_date = min(parsed_dates)
 
     col_d1, col_d2 = st.columns(2)
-    with col_d1: start_date = st.date_input("From Date (నుండి)", value=default_start_date)
-    with col_d2: end_date = st.date_input("To Date (వరకు)", value=datetime.now().date())
+    with col_d1: start_date = st.date_input("From Date", value=default_start_date)
+    with col_d2: end_date = st.date_input("To Date", value=datetime.now().date())
         
     col_s1, col_s2, col_s3 = st.columns(3)
     with col_s1: search_name = st.text_input("👤 Search Customer Name").strip().upper()
@@ -78,51 +129,15 @@ def show_history_log_section():
                 
                 col_b1, col_b2 = st.columns(2)
                 with col_b1:
-                    if st.button("📥 IMPORT THIS DATA TO MAIN GUI", key=f"imp_{idx}", type="primary", use_container_width=True):
-                        
-                        # 🎯 [🎯 FIX]: Manual Mode ఆన్ లో ఉందో లేదో ఇక్కడ చెక్ చేస్తున్నాము
-                        is_manual_mode_on = st.session_state.get("manual_mode_checkbox", False)
-                        
-                        if is_manual_mode_on:
-                            # Manual Mode ON లో ఉంటే పాత బిల్ నెంబర్ మరియు పాత డేట్ వస్తాయి
-                            st.session_state.bill_no = record.get('bill_no', '')
-                            st.session_state.manual_date = record.get('date', '')
-                        else:
-                            # Manual Mode OFF లో ఉంటే పాత వివరాలు రావు, రన్నింగ్ సీరియల్ కి రీసెట్ అవుతుంది
-                            st.session_state.bill_no = "" 
-                            st.session_state.manual_date = datetime.now().strftime('%d-%m-%Y')
-                        
-                        # మిగిలిన కస్టమర్ వివరాలు ఎప్పుడూ ఇంపోర్ట్ అవుతాయి
-                        st.session_state.cust_name = record.get('name', '')
-                        st.session_state.cust_phone = record.get('phone', '')
-                        st.session_state.cust_pro = record.get('pro', '')
-                        st.session_state.cust_area = record.get('area', '')
-                        st.session_state.bill_items = record.get('items', [])
-                        
-                        # లొకేషన్ బాక్సుల అప్‌డేట్
-                        st.session_state.txt_jur = record.get('jurisdiction', '')
-                        st.session_state.txt_trd = record.get('trade', '')
-                        st.session_state.txt_twn = record.get('town', '')
-                        st.session_state.txt_vlg = record.get('vlg', '')
-                        st.session_state.txt_pin = record.get('pin', '')
-                        
-                        # కాటా స్పెసిఫికేషన్ వివరాలు కూడా మెయిన్ స్క్రీన్ బాక్సుల్లోకి ఇంపోర్ట్ అవ్వడానికి లాజిక్
-                        items_list = record.get('items', [])
-                        if items_list:
-                            first_item = items_list[0]
-                            st.session_state.txt_mk = first_item.get('make', '')
-                            st.session_state.txt_md = first_item.get('model', '')
-                            st.session_state.txt_mx = first_item.get('max', '')
-                            st.session_state.txt_mn = first_item.get('min', '')
-                            st.session_state.txt_cls = first_item.get('class', '')
-                            st.session_state.txt_ac = first_item.get('acc', '')
-                            st.session_state.txt_mc = first_item.get('mc_no', '')
-                        
-                        for kp in ["jur", "trd", "twn", "vlg", "pin", "mk", "md", "mx", "mn", "cls", "ac", "mc"]:
-                            st.session_state[f"sel_{kp}"] = "▼"
-                        
-                        st.success("🎉 డేటా విజయవంతంగా ఇంపోర్ట్ చేయబడింది!")
-                        st.rerun()
+                    # 🎯 ఇక్కడ ఆన్ క్లిక్ లో కాల్‌బ్యాక్ ఫంక్షన్ కి రికార్డ్ పాస్ చేస్తున్నాము. ఇది వందశాతం సేఫ్!
+                    st.button(
+                        "📥 IMPORT THIS DATA TO MAIN GUI", 
+                        key=f"imp_{idx}", 
+                        type="primary", 
+                        use_container_width=True,
+                        on_click=import_history_to_session_callback,
+                        args=(record,)
+                    )
                 with col_b2:
                     st.link_button("📲 SEND WHATSAPP REMINDER", wa_url, use_container_width=True)
 
