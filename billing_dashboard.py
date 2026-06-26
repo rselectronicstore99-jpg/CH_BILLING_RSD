@@ -100,14 +100,15 @@ def show_billing_dashboard(current_user):
     # ---- 🧾 ట్యాబ్ 1: చల్లానా జనరేటర్ ----
     with tab_create:
         
-        # లాగిన్ అయిన యూజర్ యొక్క షాప్ పేరు (ఒకవేళ లేకపోతే యూజర్ నేమ్ చూపిస్తుంది)
-        shop_name = current_user.get('Shop_Name', current_user.get('Username', 'MY BILLING SHOP')).upper()
+        # 🎯 [FIXED LOGIC]: ఒకవేళ 'Shop_Name' డేటాబేస్ లో ఖాళీగా ("") ఉన్నా సరే, ఆటోమేటిక్‌గా Username ని తీసుకుంటుంది.
+        user_shop = current_user.get('Shop_Name') or current_user.get('Username') or 'MY BILLING SHOP'
+        shop_name = str(user_shop).strip().upper()
         
-        # 🌟 షాప్ పేరు బిగ్ & బోల్డ్ మరియు వెల్కమ్ మెసేజ్ స్టైలిష్ డిజైన్
+        # 🌟 [FIXED DESIGN]: ఏ థీమ్ (లైట్/డార్క్) లోనైనా టెక్స్ట్ స్పష్టంగా కనిపించేలా బార్డర్ బాక్స్ స్టైల్‌ను అప్‌డేట్ చేశాం.
         st.markdown(f"""
-            <div style='text-align: center; margin-bottom: 25px; padding: 15px; border-radius: 10px; background-color: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1);'>
-                <h1 style='margin: 0; font-size: 36px; font-weight: 900; color: #00D2FF; letter-spacing: 1px;'>🏢 {shop_name}</h1>
-                <p style='margin: 8px 0 0 0; font-size: 16px; font-style: italic; color: #aaaaaa;'>✨ Welcome to Challana Generator Dashboard ✨</p>
+            <div style='text-align: center; margin-bottom: 25px; padding: 15px; border-radius: 10px; background-color: rgba(128, 128, 128, 0.1); border: 1px solid rgba(128, 128, 128, 0.2);'>
+                <h1 style='margin: 0; font-size: 34px; font-weight: bold; letter-spacing: 1px;'>🏢 {shop_name}</h1>
+                <p style='margin: 8px 0 0 0; font-size: 15px; font-style: italic; opacity: 0.7;'>✨ Welcome to Challana Generator Dashboard ✨</p>
             </div>
         """, unsafe_allow_html=True)
 
@@ -262,7 +263,7 @@ def show_billing_dashboard(current_user):
     with tab_history:
         show_history_log_section()
 
-    # ---- ⚙️ ట్యాబ్ 3: SHOP SETTINGS (ADDED UPLOAD FEATURE) ----
+    # ---- ⚙️ ట్యాబ్ 3: SHOP SETTINGS ----
     with tab_settings:
         st.markdown("### 🏪 Shop Settings & Assets")
         username = current_user.get('Username', '').strip()
@@ -271,7 +272,6 @@ def show_billing_dashboard(current_user):
         st.markdown("---")
         st.markdown("#### 🖼️ Shop Logo Management")
         
-        # అప్పటికే ఉన్న లోగోను చెక్ చేయడం
         logo_path = None
         for ext in ['.png', '.jpg', '.jpeg', '.PNG', '.JPG', '.JPEG']:
             p = os.path.join(BASE_DIR, f"{username}_logo{ext}")
@@ -280,22 +280,20 @@ def show_billing_dashboard(current_user):
                 break
         
         if logo_path:
-            st.image(logo_path, caption="ప్రస్తుత షాప్ లోగో (Current Logo)", width=130)
+            st.image(logo_path, caption="Current Logo", width=130)
             if st.button("🗑️ Delete Existing Logo", key="del_logo_btn", type="secondary"):
                 os.remove(logo_path)
                 st.success("షాప్ లోగో విజయవంతంగా డిలీట్ చేయబడింది!")
                 st.rerun()
         else:
-            st.info("ప్రస్తుతం ఎటువంటి లోగో అప్‌లోడ్ చేయబడలేదు. (PDF లో ఖాళీగా వస్తుంది)")
+            st.info("ప్రస్తుతం ఎటువంటి లోగో అప్‌లోడ్ చేయబడలేదు.")
             
         uploaded_logo = st.file_uploader("Upload New Logo (PNG / JPG)", type=["png", "jpg", "jpeg"], key="logo_uploader")
         if uploaded_logo is not None:
-            # పాత ఫైల్స్ ఏవైనా ఉంటే క్లీన్ చేయడం
             for ext in ['.png', '.jpg', '.jpeg', '.PNG', '.JPG', '.JPEG']:
                 p = os.path.join(BASE_DIR, f"{username}_logo{ext}")
                 if os.path.exists(p): os.remove(p)
                 
-            # కొత్త ఫైల్ సేవ్ చేయడం
             file_ext = os.path.splitext(uploaded_logo.name)[1]
             new_logo_path = os.path.join(BASE_DIR, f"{username}_logo{file_ext}")
             with open(new_logo_path, "wb") as f:
@@ -307,7 +305,6 @@ def show_billing_dashboard(current_user):
         st.markdown("---")
         st.markdown("#### ✍️ Authorized Signature Management")
         
-        # అప్పటికే ఉన్న సంతకం చెక్ చేయడం
         sign_path = None
         for ext in ['.png', '.jpg', '.jpeg', '.PNG', '.JPG', '.JPEG']:
             p = os.path.join(BASE_DIR, f"{username}_sign{ext}")
@@ -316,7 +313,7 @@ def show_billing_dashboard(current_user):
                 break
                 
         if sign_path:
-            st.image(sign_path, caption="ప్రస్తుత సంతకం (Current Signature)", width=150)
+            st.image(sign_path, caption="Current Signature", width=150)
             if st.button("🗑️ Delete Existing Signature", key="del_sign_btn", type="secondary"):
                 os.remove(sign_path)
                 st.success("సంతకం ఇమేజ్ విజయవంతంగా డిలీట్ చేయబడింది!")
@@ -326,12 +323,10 @@ def show_billing_dashboard(current_user):
             
         uploaded_sign = st.file_uploader("Upload New Signature (PNG / JPG)", type=["png", "jpg", "jpeg"], key="sign_uploader")
         if uploaded_sign is not None:
-            # పాత సంతకం ఫైల్స్ క్లీన్ చేయడం
             for ext in ['.png', '.jpg', '.jpeg', '.PNG', '.JPG', '.JPEG']:
                 p = os.path.join(BASE_DIR, f"{username}_sign{ext}")
                 if os.path.exists(p): os.remove(p)
                 
-            # కొత్త సంతకం సేవ్ చేయడం
             file_ext = os.path.splitext(uploaded_sign.name)[1]
             new_sign_path = os.path.join(BASE_DIR, f"{username}_sign{file_ext}")
             with open(new_sign_path, "wb") as f:
