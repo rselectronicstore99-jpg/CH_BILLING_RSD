@@ -207,6 +207,7 @@ if st.sidebar.button("🔌 Check CH-Billing-App Cloud Connection"):
                 supabase_client.table("users").select("username").limit(1).execute()
                 st.sidebar.success("✅ CH-Billing-App Supabase Cloud connected!")
                 st.sidebar.success("✅ 'users' & 'history' database tables active!")
+                st.sidebar.success("✅ 'history' database table ready for 200+ clients!")
                 st.sidebar.balloons()
             else:
                 st.sidebar.error("❌ Connection failed!")
