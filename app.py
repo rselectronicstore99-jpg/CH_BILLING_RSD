@@ -1,13 +1,13 @@
 import streamlit as st
 import os
 import json
-import time
+import re  # 🔥 అల్ఫాన్యూమరిక్ బిల్ నంబర్స్ (CH_100) కోసం యాడ్ చేసాం
 from datetime import datetime, date, timedelta
 from database import load_json, save_json, USERS_FILE, HISTORY_FILE, generate_system_id, register_system_customer, calculate_valid_key
 
-SESSION_FILE = "session.json"
+SESSION_FILE = "session.json" 
 
-st.set_page_config(page_title="CH-Billing-App", layout="centered")
+st.set_page_config(page_title="RS Electronic Ultimate", layout="centered")
 
 def init_session_state_safe():
     defaults = {
@@ -28,17 +28,35 @@ def init_session_state_safe():
 
 init_session_state_safe()
 
+# 🔄 CH_100 టైప్ బిల్ నంబర్లను ఆటోమేటిక్ గా పెంచే స్మార్ట్ ఫంక్షన్
 def set_next_bill_no_for_user(username):
     history_records = load_json(HISTORY_FILE, [])
     user_bill_numbers = []
     for r in history_records:
-        if r.get('username') == username or r.get('user_id') == username:
-            try: user_bill_numbers.append(int(r.get('bill_no', 0)))
-            except: pass
+        if r.get('username') == username or r.get('user_id') == username or r.get('Username') == username:
+            bno_str = str(r.get('bill_no', '')).strip()
+            if bno_str:
+                user_bill_numbers.append(bno_str)
+                
     if user_bill_numbers:
-        st.session_state.bill_no = str(max(user_bill_numbers) + 1)
+        # బిల్ నంబర్ చివర ఉన్న అంకెలను వెతుకుతుంది
+        def extract_num(bno_str):
+            match = re.search(r'\d+$', bno_str)
+            return int(match.group()) if match else 0
+            
+        # అన్నిటికంటే పెద్ద బిల్ నంబర్ ని తీసుకుంటుంది
+        max_bill = max(user_bill_numbers, key=extract_num)
+        
+        # ఆ బిల్ నంబర్ లోని టెక్స్ట్ ని (CH_) మరియు నంబర్ ని (100) విడదీసి నంబర్ ని 1 పెంచుతుంది
+        match = re.search(r'(.*??)(\d+)$', max_bill)
+        if match:
+            prefix = match.group(1)
+            num = int(match.group(2))
+            st.session_state.bill_no = f"{prefix}{num + 1}"
+        else:
+            st.session_state.bill_no = "CH_100"
     else:
-        st.session_state.bill_no = "100"
+        st.session_state.bill_no = "CH_100"
 
 url_params = st.query_params
 url_id = url_params.get("id", None)
@@ -71,7 +89,7 @@ if not st.session_state.is_logged_in and (url_id or saved_user):
             st.rerun()
 
 if not st.session_state.is_logged_in:
-    st.title("CH-Billing-App")
+    st.title("RS Electronic Ultimate")
     st.markdown("---")
     
     tab1, tab2 = st.tabs(["🔐 Existing User Login", "📝 Register New Shop (7 Days Trial)"])
@@ -87,10 +105,10 @@ if not st.session_state.is_logged_in:
                 if login_user == "admin" and login_pass == "rs2026":
                     st.session_state.is_logged_in = True
                     st.session_state.user_profile = {
-                        "Username": "admin", "Key_Type": "Lifetime", "Shop_Name": "CH-Billing-App Admin",
+                        "Username": "admin", "Key_Type": "Lifetime", "Shop_Name": "RS ELECTRONICS DEVELOPER",
                         "Lic_1": "MASTER-01", "Lic_2": "", "Address_Line1": "ADMIN ZONE", "Address_Line2": "HYDERABAD"
                     }
-                    st.session_state.bill_no = "1000"
+                    st.session_state.bill_no = "CH_1000"
                     st.success("Admin login successful!")
                     st.rerun()
                 else:
@@ -150,7 +168,7 @@ if not st.session_state.is_logged_in:
                             "Lic_2": lic_2, "Address_Line1": addr_1, "Address_Line2": addr_2
                         }
                         st.session_state.is_logged_in = True
-                        st.session_state.bill_no = "100"
+                        st.session_state.bill_no = "CH_100"
                         
                         try:
                             with open(SESSION_FILE, "w") as f:
@@ -158,13 +176,13 @@ if not st.session_state.is_logged_in:
                         except: pass
                         
                         st.query_params["id"] = generated_id
-                        st.success("🎉 Account created successfully! Syncing with Database...")
-                        time.sleep(2) # క్లౌడ్ లోకి డేటా వెళ్ళడానికి 2 సెకన్లు గ్యాప్ ఇవ్వడం జరిగింది.
+                        st.success("Account created successfully!")
                         st.rerun()
                     else:
                         st.error("Data not saved local database issue.")
         st.stop()
 
+# 🔑 లైసెన్స్ వెరిఫికేషన్ మరియు లోకల్ అప్‌డేట్
 current_user = st.session_state.user_profile
 
 if current_user.get("Key_Type") == "Trial":
@@ -192,12 +210,13 @@ if current_user.get("Key_Type") == "Trial":
                 else:
                     st.error("Invalid activation key.")
             st.stop()
-        else:
+        else: 
             st.sidebar.warning(f"Trial: {days_left} Days Left")
     except: pass
 else:
     st.sidebar.success("PREMIUM LIFETIME")
 
+# 🔌 సుపాబేస్ క్లౌడ్ డేటాబేస్ కనెక్షన్ చెకర్ బటన్
 if st.sidebar.button("🔌 Check Supabase Cloud Connection"):
     try:
         if "supabase" not in st.secrets:
