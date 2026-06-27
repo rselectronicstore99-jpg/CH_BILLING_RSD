@@ -9,7 +9,7 @@ import gspread
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# 🔐 సెక్యూరిటీ మరియు ఫైల్ పాత్‌లు
+# 🔐 లైసెన్స్ సెక్యూరిటీ మరియు ఫైల్ పాత్‌లు
 SECRET_SALT = "RS_ELECTRONIC_SUPER_SECRET_2026"
 HISTORY_FILE = os.path.join(BASE_DIR, "history.json")
 USERS_FILE = os.path.join(BASE_DIR, "users.json")  
@@ -27,7 +27,7 @@ def get_gspread_client():
     return None
 
 # 📥 గూగుల్ షీట్ నుండి డేటాను చదివే ఫంక్షన్
-@st.cache_data(ttl=15)
+@st.cache_data(ttl=10)
 def fetch_from_sheets(worksheet_name):
     client = get_gspread_client()
     if not client:
@@ -68,7 +68,7 @@ def sync_to_sheets(worksheet_name, data_list, id_key):
     except:
         return False
 
-# 📥 JSON డేటా రీడ్ ఫంక్షన్ (Safe Fallback తో)
+# 📥 JSON డేటా రీడ్ ఫంక్షన్ (గూగుల్ షీట్ ఫస్ట్ ప్రాధాన్యత)
 def load_json(file_path, default_value=None):
     if default_value is None:
         default_value = []
@@ -77,7 +77,7 @@ def load_json(file_path, default_value=None):
     temp_path = os.path.join(tempfile.gettempdir(), filename)
     local_data = default_value
 
-    # మొదట మెయిన్ ఫోల్డర్ లేదా సేఫ్ టెంప్ ఫోల్డర్ నుండి చదువుతుంది
+    # లోకల్ లేదా సేఫ్ టెంప్ ఫోల్డర్ నుండి చదువుతుంది (Fallback కోసం)
     if os.path.exists(file_path):
         try:
             with open(file_path, "r", encoding="utf-8") as f:
@@ -104,19 +104,18 @@ def load_json(file_path, default_value=None):
             
     return local_data
 
-# 📤 JSON డేటా రైట్ ఫంక్షన్ (క్లౌడ్ కి మొదటి ప్రాధాన్యత)
+# 📤 JSON డేటా రైట్ ఫంక్షన్ (క్లౌడ్ కి పంపుతుంది)
 def save_json(file_path, data):
     filename = os.path.basename(file_path)
     temp_path = os.path.join(tempfile.gettempdir(), filename)
     local_saved = False
 
-    # 1. మెయిన్ డైరెక్టరీ లో సేవ్ చేయడానికి ట్రై చేస్తుంది
+    # 1. లోకల్ సర్వర్ లో సేవ్ చేయడానికి ట్రై చేస్తుంది
     try:
         with open(file_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=4, ensure_ascii=False)
         local_saved = True
     except:
-        # ఫోల్డర్ లాక్ అయి ఉంటే, సేఫ్ టెంపరరీ డైరెక్టరీ లో సేవ్ చేస్తుంది
         try:
             with open(temp_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=4, ensure_ascii=False)
@@ -131,7 +130,6 @@ def save_json(file_path, data):
     if worksheet_name:
         cloud_saved = sync_to_sheets(worksheet_name, data, id_key)
         fetch_from_sheets.clear()
-        # క్లౌడ్ లో లేదా లోకల్ టెంప్ లో ఎక్కడ సేవ్ అయినా సరే యాప్ రన్ అవ్వాలి
         return cloud_saved or local_saved
         
     return local_saved
@@ -145,23 +143,10 @@ def calculate_valid_key(system_id):
     return secure_hash[:8]
 
 # 📝 కొత్త కస్టమర్ ని సేవ్ చేసే ఫంక్షన్
-def register_system_customer(system_id, *args, **kwargs):
+def register_system_customer(system_id, password, phone, shop_name, lic_1, lic_2, addr_1, addr_2):
     try:
         users = load_json(USERS_FILE, [])
         expiry_date_str = (datetime.now() + timedelta(days=7)).strftime("%Y-%m-%d")
-        
-        password = "123"
-        if len(args) == 7:
-            shop_name, phone, lic_1, lic_2, addr_1, addr_2 = args
-        elif len(args) == 8:
-            password, phone, shop_name, lic_1, lic_2, addr_1, addr_2 = args
-        else:
-            shop_name = kwargs.get("shop_name", "")
-            phone = kwargs.get("phone", "")
-            lic_1 = kwargs.get("lic_1", "")
-            lic_2 = kwargs.get("lic_2", "")
-            addr_1 = kwargs.get("addr_1", "")
-            addr_2 = kwargs.get("addr_2", "")
         
         new_user = {
             "Username": system_id,

@@ -1,12 +1,33 @@
 import streamlit as st
 import os
 import json
+import gspread
 from datetime import datetime, date, timedelta
 from database import load_json, save_json, USERS_FILE, HISTORY_FILE, generate_system_id, register_system_customer, calculate_valid_key
 
 SESSION_FILE = "session.json" 
 
 st.set_page_config(page_title="RS Electronic Ultimate", layout="centered")
+
+# 🔌 గూగుల్ షీట్ కనెక్షన్ చెకర్ బటన్ (సైడ్‌బార్ లో కనిపిస్తుంది)
+if st.sidebar.button("🔌 Check Google Sheet Connection"):
+    try:
+        if "gcp_service_account" not in st.secrets:
+            st.sidebar.error("❌ Streamlit Secrets లో 'gcp_service_account' కీస్ దొరకలేదు!")
+        else:
+            creds = st.secrets["gcp_service_account"]
+            client = gspread.service_account_from_dict(creds)
+            sheet = client.open("RS_Billing_Database")
+            st.sidebar.success("✅ Google Sheet 'RS_Billing_Database' Found!")
+            
+            u_sheet = sheet.worksheet("Users")
+            st.sidebar.success("✅ 'Users' Worksheet Tab Found!")
+            
+            h_sheet = sheet.worksheet("History")
+            st.sidebar.success("✅ 'History' Worksheet Tab Found!")
+            st.sidebar.balloons()
+    except Exception as e:
+        st.sidebar.error(f"❌ Connection Error: {e}")
 
 def init_session_state_safe():
     defaults = {
@@ -163,7 +184,7 @@ if not st.session_state.is_logged_in:
                         st.error("Data not saved local database issue.")
         st.stop()
 
-# 🔑 లైసెన్స్ వెరిఫికేషన్ మరియు లోకల్ అప్‌డేట్
+# 🔑 లైసెన్స్ వెరిఫికేషన్
 current_user = st.session_state.user_profile
 
 if current_user.get("Key_Type") == "Trial":
