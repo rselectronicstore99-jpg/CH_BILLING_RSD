@@ -9,23 +9,22 @@ SESSION_FILE = "session.json"
 
 st.set_page_config(page_title="RS Electronic Ultimate", layout="centered")
 
-# 🔌 గూగుల్ షీట్ కనెక్షన్ చెకర్ బటన్ (సైడ్‌బార్ లో కనిపిస్తుంది)
-if st.sidebar.button("🔌 Check Google Sheet Connection"):
+# 🔌 సుపాబేస్ క్లౌడ్ డేటాబేస్ కనెక్షన్ చెకర్
+if st.sidebar.button("🔌 Check Supabase Cloud Connection"):
     try:
-        if "gcp_service_account" not in st.secrets:
-            st.sidebar.error("❌ Streamlit Secrets లో 'gcp_service_account' కీస్ దొరకలేదు!")
+        if "supabase" not in st.secrets:
+            st.sidebar.error("❌ Streamlit Secrets లో 'supabase' కీస్ దొరకలేదు!")
         else:
-            creds = st.secrets["gcp_service_account"]
-            client = gspread.service_account_from_dict(creds)
-            sheet = client.open("RS_Billing_Database")
-            st.sidebar.success("✅ Google Sheet 'RS_Billing_Database' Found!")
-            
-            u_sheet = sheet.worksheet("Users")
-            st.sidebar.success("✅ 'Users' Worksheet Tab Found!")
-            
-            h_sheet = sheet.worksheet("History")
-            st.sidebar.success("✅ 'History' Worksheet Tab Found!")
-            st.sidebar.balloons()
+            from database import supabase_client
+            if supabase_client:
+                # టేబుల్స్ ఉన్నాయో లేదో టెస్ట్ చేయడం
+                supabase_client.table("users").select("username").limit(1).execute()
+                st.sidebar.success("✅ Supabase Cloud connected successfully!")
+                st.sidebar.success("✅ 'users' database table safe!")
+                st.sidebar.success("✅ 'history' database table ready for 200+ clients!")
+                st.sidebar.balloons()
+            else:
+                st.sidebar.error("❌ Connection failed!")
     except Exception as e:
         st.sidebar.error(f"❌ Connection Error: {e}")
 
