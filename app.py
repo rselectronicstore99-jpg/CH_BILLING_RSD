@@ -1,12 +1,13 @@
 import streamlit as st
 import os
 import json
+import time
 from datetime import datetime, date, timedelta
 from database import load_json, save_json, USERS_FILE, HISTORY_FILE, generate_system_id, register_system_customer, calculate_valid_key
 
-SESSION_FILE = "session.json" 
+SESSION_FILE = "session.json"
 
-st.set_page_config(page_title="RS Electronic Ultimate", layout="centered")
+st.set_page_config(page_title="CH-Billing-App", layout="centered")
 
 def init_session_state_safe():
     defaults = {
@@ -70,7 +71,7 @@ if not st.session_state.is_logged_in and (url_id or saved_user):
             st.rerun()
 
 if not st.session_state.is_logged_in:
-    st.title("RS Electronic Ultimate")
+    st.title("CH-Billing-App")
     st.markdown("---")
     
     tab1, tab2 = st.tabs(["🔐 Existing User Login", "📝 Register New Shop (7 Days Trial)"])
@@ -86,7 +87,7 @@ if not st.session_state.is_logged_in:
                 if login_user == "admin" and login_pass == "rs2026":
                     st.session_state.is_logged_in = True
                     st.session_state.user_profile = {
-                        "Username": "admin", "Key_Type": "Lifetime", "Shop_Name": "RS ELECTRONICS DEVELOPER",
+                        "Username": "admin", "Key_Type": "Lifetime", "Shop_Name": "CH-Billing-App Admin",
                         "Lic_1": "MASTER-01", "Lic_2": "", "Address_Line1": "ADMIN ZONE", "Address_Line2": "HYDERABAD"
                     }
                     st.session_state.bill_no = "1000"
@@ -157,13 +158,13 @@ if not st.session_state.is_logged_in:
                         except: pass
                         
                         st.query_params["id"] = generated_id
-                        st.success("Account created successfully!")
+                        st.success("🎉 Account created successfully! Syncing with Database...")
+                        time.sleep(2) # క్లౌడ్ లోకి డేటా వెళ్ళడానికి 2 సెకన్లు గ్యాప్ ఇవ్వడం జరిగింది.
                         st.rerun()
                     else:
                         st.error("Data not saved local database issue.")
         st.stop()
 
-# 🔑 లైసెన్స్ వెరిఫికేషన్ మరియు లోకల్ అప్‌డేట్
 current_user = st.session_state.user_profile
 
 if current_user.get("Key_Type") == "Trial":
@@ -191,13 +192,12 @@ if current_user.get("Key_Type") == "Trial":
                 else:
                     st.error("Invalid activation key.")
             st.stop()
-        else: 
+        else:
             st.sidebar.warning(f"Trial: {days_left} Days Left")
     except: pass
 else:
     st.sidebar.success("PREMIUM LIFETIME")
 
-# 🔌 సుపాబేస్ క్లౌడ్ డేటాబేస్ కనెక్షన్ చెకర్ బటన్
 if st.sidebar.button("🔌 Check Supabase Cloud Connection"):
     try:
         if "supabase" not in st.secrets:
@@ -205,7 +205,6 @@ if st.sidebar.button("🔌 Check Supabase Cloud Connection"):
         else:
             from database import supabase_client
             if supabase_client:
-                # టేబుల్ యాక్సెస్ టెస్ట్ చేయడం
                 supabase_client.table("users").select("username").limit(1).execute()
                 st.sidebar.success("✅ Supabase Cloud connected successfully!")
                 st.sidebar.success("✅ 'users' database table safe!")
