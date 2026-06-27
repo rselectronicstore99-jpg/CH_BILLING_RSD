@@ -18,16 +18,13 @@ def draw_cell_text(canvas_obj, text, x, y, max_width, font_name="Helvetica-Bold"
         text = text[:-1]
     canvas_obj.drawString(x, y, text)
 
-# 🎯 [🎯 SAFE CALLBACK]: సెషన్ స్టేట్ వాల్యూస్ క్రాష్ అవ్వకుండా మార్చడానికి ఈ కాల్‌బ్యాక్ మాత్రమే వాడాలి
 def import_history_to_session_callback(record):
     is_manual_mode_on = st.session_state.get("manual_mode_checkbox", False)
     
     if is_manual_mode_on:
-        # Manual Mode ఆన్ లో ఉంటే పాత రికార్డు లోని బిల్ నెంబర్, తేదీ వస్తాయి
         st.session_state.bill_no = record.get('bill_no', '')
         st.session_state.manual_date = record.get('date', '')
     else:
-        # Manual Mode ఆఫ్ లో ఉంటే ఖాళీ అవుతుంది (ఆటోమేటిక్ గా రన్నింగ్ సీరియల్ నెంబర్ తీసుకుంటుంది)
         st.session_state.bill_no = "" 
         st.session_state.manual_date = datetime.now().strftime('%d-%m-%Y')
     
@@ -45,6 +42,9 @@ def import_history_to_session_callback(record):
     st.session_state.txt_vlg = record.get('vlg', '')
     st.session_state.txt_pin = record.get('pin', '')
     
+    # ✨ [NEW FEATURE IMPORT]: సబ్ క్లయింట్ పేరు కూడా ఆటో లోడ్ అవుతుంది
+    st.session_state.txt_sub = record.get('sub_client', '')
+    
     # మొదటి ఐటెమ్ యొక్క స్పెసిఫికేషన్ వివరాలు
     items_list = record.get('items', [])
     if items_list:
@@ -57,10 +57,9 @@ def import_history_to_session_callback(record):
         st.session_state.txt_ac = first_item.get('acc', '')
         st.session_state.txt_mc = first_item.get('mc_no', '')
     
-    for kp in ["jur", "trd", "twn", "vlg", "pin", "mk", "md", "mx", "mn", "cls", "ac", "mc"]:
+    for kp in ["jur", "trd", "twn", "vlg", "pin", "mk", "md", "mx", "mn", "cls", "ac", "mc", "sub"]:
         st.session_state[f"sel_{kp}"] = "▼"
         
-    # అలర్ట్ మెసేజ్ చూపించడానికి ట్రిగ్గర్ ఆన్
     st.session_state.import_success_trigger = True
 
 
@@ -68,7 +67,6 @@ def show_history_log_section():
     st.markdown("### 📅 Filter & Search History Logs")
     history_records = load_json(HISTORY_FILE, [])
     
-    # డేటా సక్సెస్ ఫుల్ గా ఇంపోర్ట్ అయిందని చూపించే అలర్ట్
     if st.session_state.get("import_success_trigger"):
         st.success("🎉 డేటా విజయవంతంగా ఇంపోర్ట్ చేయబడింది! దయచేసి 'CREATE CHALLANA' ట్యాబ్ ఓపెన్ చేసి చూడండి.")
         st.session_state.import_success_trigger = False
@@ -96,6 +94,13 @@ def show_history_log_section():
     with col_d1: start_date = st.date_input("From Date", value=default_start_date)
     with col_d2: end_date = st.date_input("To Date", value=datetime.now().date())
         
+    # ✨ [NEW FEATURE FILTER]: SUB క్లయింట్స్ లిస్ట్ ను డ్రాప్‌డౌన్ గా చూపిస్తుంది
+    user_subs = sorted(list(set([
+        str(r.get('sub_client', '')).strip().upper() 
+        for r in history_records if r.get('sub_client')
+    ])))
+    filter_sub = st.selectbox("🗂️ Filter by SUB Account (Salesman)", ["ALL SUB CUSTOMERS"] + user_subs)
+
     col_s1, col_s2, col_s3 = st.columns(3)
     with col_s1: search_name = st.text_input("👤 Search Customer Name").strip().upper()
     with col_s2: search_phone = st.text_input("📞 Search Phone Number").strip()
@@ -105,11 +110,18 @@ def show_history_log_section():
     is_searching = bool(search_name or search_phone or search_bill)
 
     for record in history_records:
+        # 1. సబ్ క్లయింట్ ఫిల్టర్ కండిషన్ చెకింగ్
+        if filter_sub != "ALL SUB CUSTOMERS":
+            if str(record.get('sub_client', '')).strip().upper() != filter_sub:
+                continue
+                
+        # 2. డేట్ ఫిల్టర్ చెకింగ్
         if not is_searching:
             try:
                 rec_date = datetime.strptime(record.get('date', ''), '%d-%m-%Y').date()
                 if not (start_date <= rec_date <= end_date): continue
             except: pass
+            
         if search_name and search_name not in record.get('name', '').upper(): continue
         if search_phone and search_phone not in record.get('phone', ''): continue
         if search_bill and search_bill not in record.get('bill_no', ''): continue
@@ -120,7 +132,9 @@ def show_history_log_section():
     
     with tab1:
         for idx, record in enumerate(reversed(filtered_records)):
-            with st.expander(f"🧾 Bill: {record.get('bill_no')} | {record.get('date')} | {record.get('name')} | ₹{record.get('total')}/-"):
+            # Expander టైటిల్ లోనే SUB ఖాతా పేరు కూడా ఈజీగా కనిపిస్తుంది
+            sub_label = f" | SUB: {record.get('sub_client')}" if record.get('sub_client') else ""
+            with st.expander(f"🧾 Bill: {record.get('bill_no')} | {record.get('date')} | {record.get('name')} | ₹{record.get('total')}/-{sub_label}"):
                 st.write(f"📍 **Address:** {record.get('town')}, {record.get('vlg')} ({record.get('pin')}) | 📞 **Phone:** {record.get('phone')}")
                 st.table(record.get('items', []))
                 
@@ -129,7 +143,6 @@ def show_history_log_section():
                 
                 col_b1, col_b2 = st.columns(2)
                 with col_b1:
-                    # 🎯 ఇక్కడ ఆన్ క్లిక్ లో కాల్‌బ్యాక్ ఫంక్షన్ కి రికార్డ్ పాస్ చేస్తున్నాము. ఇది వందశాతం సేఫ్!
                     st.button(
                         "📥 IMPORT THIS DATA TO MAIN GUI", 
                         key=f"imp_{idx}", 

@@ -100,11 +100,9 @@ def show_billing_dashboard(current_user):
     # ---- 🧾 ట్యాబ్ 1: చల్లానా జనరేటర్ ----
     with tab_create:
         
-        # 🎯 [FIXED LOGIC]: ఒకవేళ 'Shop_Name' డేటాబేస్ లో ఖాళీగా ("") ఉన్నా సరే, ఆటోమేటిక్‌గా Username ని తీసుకుంటుంది.
         user_shop = current_user.get('Shop_Name') or current_user.get('Username') or 'MY BILLING SHOP'
         shop_name = str(user_shop).strip().upper()
         
-        # 🌟 [FIXED DESIGN]: ఏ థీమ్ (లైట్/డార్క్) లోనైనా టెక్స్ట్ స్పష్టంగా కనిపించేలా బార్డర్ బాక్స్ స్టైల్‌ను అప్‌డేట్ చేశాం.
         st.markdown(f"""
             <div style='text-align: center; margin-bottom: 25px; padding: 15px; border-radius: 10px; background-color: rgba(128, 128, 128, 0.1); border: 1px solid rgba(128, 128, 128, 0.2);'>
                 <h1 style='margin: 0; font-size: 34px; font-weight: bold; letter-spacing: 1px;'>🏢 {shop_name}</h1>
@@ -157,6 +155,23 @@ def show_billing_dashboard(current_user):
                 st.session_state.bill_no = next_regular_bill
                 st.session_state.manual_date = datetime.now().strftime('%d-%m-%Y')
                 st.rerun()
+
+        # ✨ [NEW FEATURE]: SUB ACCOUNT WIDGET ROW
+        st.markdown("---")
+        existing_subs = sorted(list(set([
+            str(r.get('sub_client', '')).strip().upper() 
+            for r in history_records if r.get('sub_client')
+        ])))
+        col_sub1, col_sub2 = st.columns([3.8, 1.2])
+        with col_sub1:
+            final_sub = render_smart_input("SUB: (Account / Salesman Name)", existing_subs, "sub")
+        with col_sub2:
+            st.markdown("<p style='margin-bottom: -5px; height: 14px;'></p>", unsafe_allow_html=True)
+            if st.button("🧹 Clear SUB", key="clear_sub_btn", use_container_width=True):
+                st.session_state["txt_sub"] = ""
+                st.session_state["sel_sub"] = "▼"
+                st.rerun()
+        st.markdown("---")
 
         st.markdown("#### 👤 Customer Information")
         col_c1, col_c2 = st.columns(2)
@@ -244,7 +259,8 @@ def show_billing_dashboard(current_user):
                     "username": current_user.get('Username'), "bill_no": st.session_state.bill_no, "date": st.session_state.manual_date,
                     "name": st.session_state.cust_name, "phone": st.session_state.cust_phone, "pro": st.session_state.cust_pro, "area": st.session_state.cust_area,
                     "jurisdiction": final_jurisdiction, "trade": final_trade, "town": final_town, "vlg": final_vlg, "pin": final_pin,
-                    "total": grand_total, "items": st.session_state.bill_items
+                    "total": grand_total, "items": st.session_state.bill_items,
+                    "sub_client": final_sub  # 💾 డేటాబేస్ లో సేవ్ అవుతుంది కానీ PDF ఫంక్షన్ లోకి వెళ్ళదు
                 }
                 history.append(new_record)
                 save_json(HISTORY_FILE, history)
@@ -268,7 +284,6 @@ def show_billing_dashboard(current_user):
         st.markdown("### 🏪 Shop Settings & Assets")
         username = current_user.get('Username', '').strip()
         
-        # --- 1. SHOP LOGO SECTION ---
         st.markdown("---")
         st.markdown("#### 🖼️ Shop Logo Management")
         
@@ -301,7 +316,6 @@ def show_billing_dashboard(current_user):
             st.success("🎉 షాప్ లోగో విజయవంతంగా అప్‌డేట్ చేయబడింది!")
             st.rerun()
 
-        # --- 2. SIGNATURE SECTION ---
         st.markdown("---")
         st.markdown("#### ✍️ Authorized Signature Management")
         
