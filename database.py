@@ -30,7 +30,7 @@ def get_supabase_client() -> Client:
 
 supabase_client = get_supabase_client()
 
-# 📥 సుపాబేస్ నుండి డేటాను చదివే ఫంక్షన్ (RECOVERY & TEXT-ID FIXED)
+# 📥 సుపాబేస్ నుండి డేటాను చదివే ఫంక్షన్ (PDF & HISTORY FIX)
 def load_json(file_path, default_value=None):
     if default_value is None:
         default_value = []
@@ -65,7 +65,7 @@ def load_json(file_path, default_value=None):
             elif filename == "history.json":
                 current_user = st.session_state.get("user_profile", {}).get("Username", "")
                 
-                # సెక్యూరిటీ కోసం ప్రస్తుత క్లయింట్ యొక్క బిల్స్ మాత్రమే తెస్తుంది
+                # సెక్యూరిటీ మరియు ఖచ్చితత్వం కోసం లాగిన్ అయిన క్లయింట్ బిల్లులు మాత్రమే తెస్తుంది
                 if current_user and current_user != "admin":
                     response = supabase_client.table("history").select("username", "bill_no", "data").eq("username", current_user).execute()
                 else:
@@ -76,10 +76,10 @@ def load_json(file_path, default_value=None):
                     for row in response.data:
                         h = row["data"]
                         if isinstance(h, dict):
-                            # 🔥 CRITICAL RECOVERY FIX: క్లౌడ్ నుండి తెచ్చేటప్పుడు యూజర్ ఐడీ మరియు 
-                            # 'CH_100' లాంటి టెక్స్ట్ బిల్ ఐడీలను మళ్లీ JSON డేటా లోపలికి ఇంజెక్ట్ చేస్తుంది!
+                            # 🔥 CRITICAL PDF FIX: క్లౌడ్ నుండి తెచ్చేటప్పుడు బిల్ లోపల 'username' మరియు 'bill_no' ని ఇంజెక్ట్ చేస్తుంది!
                             h["username"] = row["username"]
                             h["bill_no"] = row["bill_no"]
+                            h["Username"] = row["username"]
                         cloud_data.append(h)
                         
                 if cloud_data:
@@ -125,11 +125,12 @@ def save_json(file_path, data):
                 for h in data:
                     if not isinstance(h, dict): continue
                     uname = h.get('username') or h.get('user_id') or h.get('Username') or current_user
-                    bno = str(h.get('bill_no') or "CH_100")
+                    bno = str(h.get('bill_no') or "100")
                     
-                    # బిల్ ఆబ్జెక్ట్ లోపల కూడా ఐడీలను స్టోర్ చేస్తుంది
+                    # బిల్ ఆబ్జెక్ట్ లోపల కూడా విలువలను ఖచ్చితంగా భద్రపరుస్తుంది
                     h['username'] = uname
                     h['bill_no'] = bno
+                    h['Username'] = uname
                     
                     unique_bill_id = f"{uname}_{bno}"
                     payload.append({"id": unique_bill_id, "username": uname, "bill_no": bno, "data": h})

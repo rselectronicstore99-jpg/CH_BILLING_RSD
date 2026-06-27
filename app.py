@@ -1,7 +1,6 @@
 import streamlit as st
 import os
 import json
-import re  # 🔥 అల్ఫాన్యూమరిక్ బిల్ నంబర్స్ (CH_100) కోసం యాడ్ చేసాం
 from datetime import datetime, date, timedelta
 from database import load_json, save_json, USERS_FILE, HISTORY_FILE, generate_system_id, register_system_customer, calculate_valid_key
 
@@ -28,35 +27,22 @@ def init_session_state_safe():
 
 init_session_state_safe()
 
-# 🔄 CH_100 టైప్ బిల్ నంబర్లను ఆటోమేటిక్ గా పెంచే స్మార్ట్ ఫంక్షన్
+# 🔄 ప్యూర్ నంబర్ బిల్లుల కోసం స్మార్ట్ ఆటో-ఇంక్రిమెంట్ ఫంక్షన్
 def set_next_bill_no_for_user(username):
     history_records = load_json(HISTORY_FILE, [])
     user_bill_numbers = []
     for r in history_records:
-        if r.get('username') == username or r.get('user_id') == username or r.get('Username') == username:
-            bno_str = str(r.get('bill_no', '')).strip()
-            if bno_str:
-                user_bill_numbers.append(bno_str)
-                
+        r_user = r.get('username') or r.get('user_id') or r.get('Username')
+        if str(r_user).strip() == str(username).strip():
+            try: 
+                bno = r.get('bill_no')
+                if bno is not None:
+                    user_bill_numbers.append(int(bno))
+            except: pass
     if user_bill_numbers:
-        # బిల్ నంబర్ చివర ఉన్న అంకెలను వెతుకుతుంది
-        def extract_num(bno_str):
-            match = re.search(r'\d+$', bno_str)
-            return int(match.group()) if match else 0
-            
-        # అన్నిటికంటే పెద్ద బిల్ నంబర్ ని తీసుకుంటుంది
-        max_bill = max(user_bill_numbers, key=extract_num)
-        
-        # ఆ బిల్ నంబర్ లోని టెక్స్ట్ ని (CH_) మరియు నంబర్ ని (100) విడదీసి నంబర్ ని 1 పెంచుతుంది
-        match = re.search(r'(.*??)(\d+)$', max_bill)
-        if match:
-            prefix = match.group(1)
-            num = int(match.group(2))
-            st.session_state.bill_no = f"{prefix}{num + 1}"
-        else:
-            st.session_state.bill_no = "CH_100"
+        st.session_state.bill_no = str(max(user_bill_numbers) + 1)
     else:
-        st.session_state.bill_no = "CH_100"
+        st.session_state.bill_no = "100"  # హిస్టరీ లేకపోతే డిఫాల్ట్ స్టార్టింగ్ నంబర్
 
 url_params = st.query_params
 url_id = url_params.get("id", None)
@@ -108,7 +94,7 @@ if not st.session_state.is_logged_in:
                         "Username": "admin", "Key_Type": "Lifetime", "Shop_Name": "RS ELECTRONICS DEVELOPER",
                         "Lic_1": "MASTER-01", "Lic_2": "", "Address_Line1": "ADMIN ZONE", "Address_Line2": "HYDERABAD"
                     }
-                    st.session_state.bill_no = "CH_1000"
+                    st.session_state.bill_no = "1000"
                     st.success("Admin login successful!")
                     st.rerun()
                 else:
@@ -168,7 +154,7 @@ if not st.session_state.is_logged_in:
                             "Lic_2": lic_2, "Address_Line1": addr_1, "Address_Line2": addr_2
                         }
                         st.session_state.is_logged_in = True
-                        st.session_state.bill_no = "CH_100"
+                        st.session_state.bill_no = "100"
                         
                         try:
                             with open(SESSION_FILE, "w") as f:
