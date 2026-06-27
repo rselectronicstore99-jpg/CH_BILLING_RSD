@@ -100,6 +100,7 @@ def show_billing_dashboard(current_user):
     # ---- 🧾 ట్యాబ్ 1: చల్లానా జనరేటర్ ----
     with tab_create:
         
+              
         user_shop = current_user.get('Shop_Name') or current_user.get('Username') or 'MY BILLING SHOP'
         shop_name = str(user_shop).strip().upper()
         
