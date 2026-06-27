@@ -6,8 +6,7 @@ from database import load_json, save_json, USERS_FILE, HISTORY_FILE, generate_sy
 
 SESSION_FILE = "session.json" 
 
-# 🏷️ CH-Billing-App టైటిల్ సెట్టింగ్
-st.set_page_config(page_title="CH-Billing-App", layout="centered")
+st.set_page_config(page_title="RS Electronic Ultimate", layout="centered")
 
 def init_session_state_safe():
     defaults = {
@@ -51,6 +50,7 @@ if os.path.exists(SESSION_FILE):
         saved_user, saved_pass = saved.get("username"), saved.get("password")
     except: pass
 
+# 🔄 లోకల్ ఆటో-లాగిన్ మేనేజ్మెంట్
 if not st.session_state.is_logged_in and (url_id or saved_user):
     target_id = url_id if url_id else saved_user
     users = load_json(USERS_FILE, [])
@@ -70,7 +70,7 @@ if not st.session_state.is_logged_in and (url_id or saved_user):
             st.rerun()
 
 if not st.session_state.is_logged_in:
-    st.title("CH-Billing-App")
+    st.title("RS Electronic Ultimate")
     st.markdown("---")
     
     tab1, tab2 = st.tabs(["🔐 Existing User Login", "📝 Register New Shop (7 Days Trial)"])
@@ -86,7 +86,7 @@ if not st.session_state.is_logged_in:
                 if login_user == "admin" and login_pass == "rs2026":
                     st.session_state.is_logged_in = True
                     st.session_state.user_profile = {
-                        "Username": "admin", "Key_Type": "Lifetime", "Shop_Name": "CH-Billing-App Admin",
+                        "Username": "admin", "Key_Type": "Lifetime", "Shop_Name": "RS ELECTRONICS DEVELOPER",
                         "Lic_1": "MASTER-01", "Lic_2": "", "Address_Line1": "ADMIN ZONE", "Address_Line2": "HYDERABAD"
                     }
                     st.session_state.bill_no = "1000"
@@ -163,6 +163,7 @@ if not st.session_state.is_logged_in:
                         st.error("Data not saved local database issue.")
         st.stop()
 
+# 🔑 లైసెన్స్ వెరిఫికేషన్ మరియు లోకల్ అప్‌డేట్
 current_user = st.session_state.user_profile
 
 if current_user.get("Key_Type") == "Trial":
@@ -196,17 +197,18 @@ if current_user.get("Key_Type") == "Trial":
 else:
     st.sidebar.success("PREMIUM LIFETIME")
 
-# 🔌 CH-Billing-App సుపాబేస్ కనెక్షన్ చెకర్
-if st.sidebar.button("🔌 Check CH-Billing-App Cloud Connection"):
+# 🔌 సుపాబేస్ క్లౌడ్ డేటాబేస్ కనెక్షన్ చెకర్ బటన్
+if st.sidebar.button("🔌 Check Supabase Cloud Connection"):
     try:
         if "supabase" not in st.secrets:
             st.sidebar.error("❌ Streamlit Secrets లో 'supabase' కీస్ దొరకలేదు!")
         else:
             from database import supabase_client
             if supabase_client:
+                # టేబుల్ యాక్సెస్ టెస్ట్ చేయడం
                 supabase_client.table("users").select("username").limit(1).execute()
-                st.sidebar.success("✅ CH-Billing-App Supabase Cloud connected!")
-                st.sidebar.success("✅ 'users' & 'history' database tables active!")
+                st.sidebar.success("✅ Supabase Cloud connected successfully!")
+                st.sidebar.success("✅ 'users' database table safe!")
                 st.sidebar.success("✅ 'history' database table ready for 200+ clients!")
                 st.sidebar.balloons()
             else:
