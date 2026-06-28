@@ -133,7 +133,13 @@ def save_json(file_path, data):
                     h['Username'] = uname
                     
                     unique_bill_id = f"{uname}_{bno}"
-                    payload.append({"id": unique_bill_id, "username": uname, "bill_no": bno, "data": h})
+                    payload.append({
+                        "id": unique_bill_id, 
+                        "username": uname, 
+                        "bill_no": bno, 
+                        "sub_client": h.get("sub_client", ""),  # 👈 ఈ లైన్ యాడ్ అయింది!
+                        "data": h
+                    })
                 
                 if payload:
                     supabase_client.table("history").upsert(payload).execute()
