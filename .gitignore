@@ -1,5 +1,6 @@
 __pycache__/
 .streamlit/config.toml
+.streamlit/secrets.toml
 session.json
 autosuggest.json
 challana_history_*.json

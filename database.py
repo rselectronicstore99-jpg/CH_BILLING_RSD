@@ -6,6 +6,10 @@ import tempfile
 from datetime import datetime, timedelta
 import streamlit as st
 from supabase import create_client, Client
+# database.py కి పైన ఈ ఇంపోర్ట్స్ యాడ్ చేయండి
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaFileUpload
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -173,5 +177,32 @@ def register_system_customer(system_id, password, phone, shop_name, lic_1, lic_2
         st.error(f"❌ డేటాబేస్ సేవింగ్ లోపం: {e}")
         return False
 
-def upload_to_drive(file_path):
-    return True
+# చివర్లో ఉన్న పాత upload_to_drive తీసేసి ఇది పెట్టండి
+def upload_to_client_google_drive(file_path, client_refresh_token):
+    try:
+        # క్లయింట్ టోకెన్ మరియు మన సీక్రెట్ కీస్ ఉపయోగించి పర్మిషన్ క్రియేట్ చేయడం
+        creds = Credentials(
+            token=None,
+            refresh_token=client_refresh_token,
+            token_uri="https://oauth2.googleapis.com/token",
+            client_id=st.secrets["google_oauth"]["client_id"],
+            client_secret=st.secrets["google_oauth"]["client_secret"]
+        )
+        
+        service = build('drive', 'v3', credentials=creds)
+        
+        # ఫైల్ పేరు, టైప్ సెట్ చేయడం
+        file_metadata = {'name': os.path.basename(file_path)}
+        media = MediaFileUpload(file_path, mimetype='application/pdf')
+        
+        # క్లయింట్ సొంత డ్రైవ్ లోకి అప్‌లోడ్ అవుతుంది
+        uploaded_file = service.files().create(
+            body=file_metadata,
+            media_body=media,
+            fields='id, webViewLink'
+        ).execute()
+        
+        return uploaded_file.get('webViewLink') # అప్‌లోడ్ అయిన ఫైల్ లింక్ వస్తుంది
+    except Exception as e:
+        st.error(f"❌ Google Drive Upload Error: {e}")
+        return None

@@ -219,6 +219,56 @@ if st.sidebar.button("🔌 Check Supabase Cloud Connection"):
                 st.sidebar.error("❌ Connection failed!")
     except Exception as e:
         st.sidebar.error(f"❌ Connection Error: {e}")
+        # =======================================================================
+    # 🔗 GOOGLE DRIVE SYNC SECTION (కొత్తగా యాడ్ చేసిన కోడ్)
+    # =======================================================================
+    from google_auth_oauthlib.flow import Flow
+    
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("📁 Google Drive Backup")
+
+    try:
+        # 1. Secrets నుండి కీస్ తీసుకుని గూగుల్ ఫ్లో సెటప్ చేయడం
+        flow = Flow.from_client_config(
+            {
+                "web": {
+                    "client_id": st.secrets["google_oauth"]["client_id"],
+                    "client_secret": st.secrets["google_oauth"]["client_secret"],
+                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                    "token_uri": "https://oauth2.googleapis.com/token",
+                }
+            },
+            scopes=['https://www.googleapis.com/auth/drive.file']
+        )
+        flow.redirect_uri = st.secrets["google_oauth"]["redirect_uri"]
+
+        # 2. గూగుల్ లింక్ బటన్ చూపించడం
+        auth_url, _ = flow.authorization_url(prompt='consent', access_type='offline')
+        st.sidebar.link_button("🔑 Connect My Drive", auth_url, use_container_width=True)
+        
+        # 3. గూగుల్ లాగిన్ అయ్యాక తిరిగి వచ్చే తాళంచెవి (Code) ని పట్టుకోవడం
+        if "code" in st.query_params:
+            auth_code = st.query_params["code"]
+            flow.fetch_token(code=auth_code)
+            ref_token = flow.credentials.refresh_token
+            
+            if ref_token:
+                from database import supabase_client
+                # ప్రస్తుతం లాగిన్ అయిన యూజర్ నేమ్ (మీ యాప్ లో ఏ వేరియబుల్ ఉంటే అది వాడండి)
+                current_user = st.session_state.get("username") 
+                
+                if supabase_client and current_user:
+                    # సుపాబేస్ లోని ఆ యూజర్ 'google_refresh_token' కాలమ్ లో టోకెన్ సేవ్ చేస్తాం
+                    supabase_client.table("users").update({"google_refresh_token": ref_token}).eq("username", current_user).execute()
+                    st.sidebar.success("✅ గూగుల్ డ్రైవ్ లింక్ అయింది భయ్యా!")
+                    st.balloons()
+                    # లింక్ అయ్యాక యుఆర్ఎల్ క్లీన్ చేయడానికి
+                    st.query_params.clear()
+    except Exception as e:
+        pass
+
+    st.sidebar.markdown("---")
+    # =======================================================================
 
 if st.sidebar.button("Logout Account"):
     st.session_state.is_logged_in = False
