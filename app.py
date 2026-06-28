@@ -227,8 +227,8 @@ if st.sidebar.button("🔌 Check Supabase Cloud Connection"):
 st.sidebar.write("---")
 st.sidebar.markdown("### 📁 Google Drive Backup")
 
-# 🌟 current_user ని ఓవర్‌రైట్ చేయకుండా వేరే కొత్త వేరియబుల్ పేరు పెట్టాం
-drive_username = current_user.get("Username")
+# ✅ కరెక్ట్ పద్ధతి: డిక్షనరీ లోపల ఉన్న Username ని తెచ్చుకోవడం
+drive_username = st.session_state.get("user_profile", {}).get("Username")
 
 if drive_username:
     # 1. గూగుల్ నుండి తిరిగి వచ్చే కోడ్ ని పట్టుకుని సుపాబేస్ లో సేవ్ చేసే లాజిక్
@@ -247,6 +247,7 @@ if drive_username:
             refresh_token = token_response.get("refresh_token")
             
             if refresh_token:
+                # సుపాబేస్ డేటాబేస్ లో టోకెన్ సేవ్ చేయడం
                 supabase_client.table("users").update({"google_refresh_token": refresh_token}).eq("username", drive_username).execute()
                 st.sidebar.success("🎉 Google Drive connected successfully!")
                 st.query_params.clear()
@@ -275,7 +276,6 @@ if drive_username:
             st.sidebar.link_button("🔑 Connect My Drive", auth_url)
     except Exception as e:
         st.sidebar.error(f"⚠️ UI Error: {e}")
-
 # =======================================================================
 
 if st.sidebar.button("Logout Account"):

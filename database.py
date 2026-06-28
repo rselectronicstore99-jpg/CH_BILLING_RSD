@@ -207,11 +207,11 @@ def upload_to_client_google_drive(file_path, client_refresh_token):
         st.error(f"❌ Google Drive Upload Error: {e}")
         return None
 
-# 2. pdf_history.py లో ImportError రాకుండా కాపాడే సపోర్టింగ్ ఫంక్షన్
 def upload_to_drive(file_path):
     """సుపాబేస్ నుండి టోకెన్ తీసుకుని, పైనున్న మీ కొత్త ఫంక్షన్‌కి పంపే బ్రిడ్జ్"""
     try:
-        current_user = st.session_state.get("username")
+        # ✅ కరెక్ట్ పద్ధతి: session_state లోని user_profile నుండి Username ని తీసుకోవడం
+        current_user = st.session_state.get("user_profile", {}).get("Username")
         if not current_user:
             return False
 
