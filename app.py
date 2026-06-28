@@ -3,7 +3,8 @@ import os
 import json
 import requests
 from datetime import datetime, date, timedelta
-from database import load_json, save_json, USERS_FILE, HISTORY_FILE, generate_system_id, register_system_customer, calculate_valid_key
+# 🌟 supabase_client ని ఇక్కడే టాప్ లో ఇంపోర్ట్ చేసాం
+from database import load_json, save_json, USERS_FILE, HISTORY_FILE, generate_system_id, register_system_customer, calculate_valid_key, supabase_client
 
 SESSION_FILE = "session.json" 
 
@@ -43,7 +44,7 @@ def set_next_bill_no_for_user(username):
     if user_bill_numbers:
         st.session_state.bill_no = str(max(user_bill_numbers) + 1)
     else:
-        st.session_state.bill_no = "100"  # హిస్టరీ లేకపోతే డిఫాల్ట్ స్టార్టింగ్ నంబర్
+        st.session_state.bill_no = "100"
 
 url_params = st.query_params
 url_id = url_params.get("id", None)
@@ -209,7 +210,6 @@ if st.sidebar.button("🔌 Check Supabase Cloud Connection"):
         if "supabase" not in st.secrets:
             st.sidebar.error("❌ Streamlit Secrets లో 'supabase' కీస్ దొరకలేదు!")
         else:
-            from database import supabase_client
             if supabase_client:
                 supabase_client.table("users").select("username").limit(1).execute()
                 st.sidebar.success("✅ Supabase Cloud connected successfully!")
@@ -220,22 +220,21 @@ if st.sidebar.button("🔌 Check Supabase Cloud Connection"):
                 st.sidebar.error("❌ Connection failed!")
     except Exception as e:
         st.sidebar.error(f"❌ Connection Error: {e}")
-        # =======================================================================
-    # 🔗 GOOGLE DRIVE SYNC SECTION (కొత్తగా యాడ్ చేసిన కోడ్)
-    # =======================================================================
-    import requests
 
+# =======================================================================
+# 🔗 GOOGLE DRIVE SYNC SECTION (ఇక్కడ కోడ్ మరియు ఇండెంటేషన్ సరిచేసాం)
+# =======================================================================
 st.sidebar.write("---")
 st.sidebar.markdown("### 📁 Google Drive Backup")
 
-current_user = st.session_state.get("username")
+# 🌟 current_user ని ఓవర్‌రైట్ చేయకుండా వేరే కొత్త వేరియబుల్ పేరు పెట్టాం
+drive_username = current_user.get("Username")
 
-if current_user:
+if drive_username:
     # 1. గూగుల్ నుండి తిరిగి వచ్చే కోడ్ ని పట్టుకుని సుపాబేస్ లో సేవ్ చేసే లాజిక్
     if "code" in st.query_params:
         auth_code = st.query_params["code"]
         try:
-            # కోడ్ ఉపయోగించి గూగుల్ నుండి రీఫ్రెష్ టోకెన్ తెచ్చుకోవడం
             token_url = "https://oauth2.googleapis.com/token"
             token_data = {
                 "code": auth_code,
@@ -248,11 +247,8 @@ if current_user:
             refresh_token = token_response.get("refresh_token")
             
             if refresh_token:
-                # సుపాబేస్ డేటాబేస్ లో టోకెన్ సేవ్ చేయడం
-                supabase_client.table("users").update({"google_refresh_token": refresh_token}).eq("username", current_user).execute()
+                supabase_client.table("users").update({"google_refresh_token": refresh_token}).eq("username", drive_username).execute()
                 st.sidebar.success("🎉 Google Drive connected successfully!")
-                
-                # URL లో ఉన్న కోడ్ పారామీటర్లను క్లియర్ చేసి యాప్ ని రీఫ్రెష్ చేయడం
                 st.query_params.clear()
                 st.rerun()
         except Exception as e:
@@ -260,15 +256,13 @@ if current_user:
 
     # 2. సుపాబేస్ లో ఆల్రెడీ టోకెన్ ఉందో లేదో చెక్ చేసి బటన్/స్టేటస్ చూపించడం
     try:
-        db_res = supabase_client.table("users").select("google_refresh_token").eq("username", current_user).execute()
+        db_res = supabase_client.table("users").select("google_refresh_token").eq("username", drive_username).execute()
         if db_res.data and db_res.data[0].get("google_refresh_token"):
             st.sidebar.success("✅ Google Drive Connected!")
             if st.sidebar.button("🔌 Disconnect Drive"):
-                # డిస్‌కనెక్ట్ నొక్కితే టోకెన్ డిలీట్ చేయడం
-                supabase_client.table("users").update({"google_refresh_token": None}).eq("username", current_user).execute()
+                supabase_client.table("users").update({"google_refresh_token": None}).eq("username", drive_username).execute()
                 st.rerun()
         else:
-            # టోకెన్ లేకపోతే మాత్రమే లింక్ బటన్ చూపిస్తుంది
             client_id = st.secrets["google_oauth"]["client_id"]
             redirect_uri = st.secrets["google_oauth"]["redirect_uri"]
             scope = "https://www.googleapis.com/auth/drive.file"
@@ -281,7 +275,8 @@ if current_user:
             st.sidebar.link_button("🔑 Connect My Drive", auth_url)
     except Exception as e:
         st.sidebar.error(f"⚠️ UI Error: {e}")
-    # =======================================================================
+
+# =======================================================================
 
 if st.sidebar.button("Logout Account"):
     st.session_state.is_logged_in = False
@@ -289,6 +284,7 @@ if st.sidebar.button("Logout Account"):
     st.query_params.clear()
     st.rerun()
 
+# 🌟 ఇప్పుడు current_user డిక్షనరీ గానే సురక్షితంగా ఉంటుంది కాబట్టి ఎర్రర్ రాదు!
 st.sidebar.info(f"ID: {current_user.get('Username')}")
 
 from billing_dashboard import show_billing_dashboard
