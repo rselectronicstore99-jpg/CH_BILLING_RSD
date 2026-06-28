@@ -177,7 +177,7 @@ def register_system_customer(system_id, password, phone, shop_name, lic_1, lic_2
         st.error(f"❌ డేటాబేస్ సేవింగ్ లోపం: {e}")
         return False
 
-# చివర్లో ఉన్న పాత upload_to_drive తీసేసి ఇది పెట్టండి
+# 1. మీరు ఇచ్చిన కొత్త ఫంక్షన్ (యధావిధిగా)
 def upload_to_client_google_drive(file_path, client_refresh_token):
     try:
         # క్లయింట్ టోకెన్ మరియు మన సీక్రెట్ కీస్ ఉపయోగించి పర్మిషన్ క్రియేట్ చేయడం
@@ -206,3 +206,23 @@ def upload_to_client_google_drive(file_path, client_refresh_token):
     except Exception as e:
         st.error(f"❌ Google Drive Upload Error: {e}")
         return None
+
+# 2. pdf_history.py లో ImportError రాకుండా కాపాడే సపోర్టింగ్ ఫంక్షన్
+def upload_to_drive(file_path):
+    """సుపాబేస్ నుండి టోకెన్ తీసుకుని, పైనున్న మీ కొత్త ఫంక్షన్‌కి పంపే బ్రిడ్జ్"""
+    try:
+        current_user = st.session_state.get("username")
+        if not current_user:
+            return False
+
+        # సుపాబేస్ నుండి ఆ యూజర్ యొక్క గూగుల్ రీఫ్రెష్ టోకెన్ తెచ్చుకోవడం
+        response = supabase_client.table("users").select("google_refresh_token").eq("username", current_user).execute()
+        
+        if response.data and response.data[0].get("google_refresh_token"):
+            token = response.data[0]["google_refresh_token"]
+            # మీరే రాసిన కొత్త ఫంక్షన్‌ను ఇక్కడి నుండి రన్ చేస్తున్నాం!
+            return upload_to_client_google_drive(file_path, token)
+        return False
+    except Exception as e:
+        print(f"⚠️ Backup Bridge Error: {e}")
+        return False
