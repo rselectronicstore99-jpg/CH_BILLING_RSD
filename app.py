@@ -3,10 +3,8 @@ import os
 import json
 import requests
 from datetime import datetime, date, timedelta
-# 🌟 supabase_client ని ఇక్కడే టాప్ లో ఇంపోర్ట్ చేసాం
+# 🌟 database నుండి ఇంపోర్ట్స్
 from database import load_json, save_json, USERS_FILE, HISTORY_FILE, generate_system_id, register_system_customer, calculate_valid_key, supabase_client
-
-SESSION_FILE = "session.json" 
 
 st.set_page_config(page_title="RS Electronic Ultimate", layout="centered")
 
@@ -49,22 +47,13 @@ def set_next_bill_no_for_user(username):
 url_params = st.query_params
 url_id = url_params.get("id", None)
 
-saved_user, saved_pass = None, None
-if os.path.exists(SESSION_FILE):
-    try:
-        with open(SESSION_FILE, "r") as f:
-            saved = json.load(f)
-        saved_user, saved_pass = saved.get("username"), saved.get("password")
-    except: pass
-
-# 🔄 లోకల్ ఆటో-లాగిన్ మేనేజ్మెంట్
-if not st.session_state.is_logged_in and (url_id or saved_user):
-    target_id = url_id if url_id else saved_user
+# 🔄 సురక్షితమైన URL ఆటో-లాగిన్ మేనేజ్మెంట్ (session.json పూర్తిగా తొలగించబడింది)
+if not st.session_state.is_logged_in and url_id:
     users = load_json(USERS_FILE, [])
     user_found = None
     
     for u in users:
-        if str(u.get('Username')).strip() == str(target_id).strip():
+        if str(u.get('Username')).strip() == str(url_id).strip():
             user_found = u
             break
             
@@ -73,7 +62,6 @@ if not st.session_state.is_logged_in and (url_id or saved_user):
             st.session_state.is_logged_in = True
             st.session_state.user_profile = user_found
             set_next_bill_no_for_user(user_found["Username"])
-            st.query_params["id"] = user_found["Username"]
             st.rerun()
 
 if not st.session_state.is_logged_in:
@@ -111,11 +99,7 @@ if not st.session_state.is_logged_in:
                         st.session_state.user_profile = user_matched
                         set_next_bill_no_for_user(user_matched["Username"])
                         
-                        try:
-                            with open(SESSION_FILE, "w") as f:
-                                json.dump({"username": login_user, "password": login_pass}, f)
-                        except: pass
-                        
+                        # URL లో ఐడి ని సెట్ చేస్తుంది, దీనివల్ల ఈ బ్రౌజర్ ట్యాబ్ కి మాత్రమే ఆటో-లాగిన్ అవుతుంది
                         st.query_params["id"] = login_user
                         st.success("Login successful!")
                         st.rerun()
@@ -125,13 +109,14 @@ if not st.session_state.is_logged_in:
     with tab2:
         st.subheader("Shop Details Setup & Registration")
         with st.form("shop_registration_form"):
-            shop_name = st.text_input("Shop Name *").upper().strip()
-            phone = st.text_input("Phone Number *").strip()
+            # ఇన్‌పుట్ బాక్సులను కొత్త క్లయింట్ల కోసం పూర్తిగా ఖాళీగా (Empty) ఉంచాం
+            shop_name = st.text_input("Shop Name *", value="").upper().strip()
+            phone = st.text_input("Phone Number *", value="").strip()
             col1, col2 = st.columns(2)
-            with col1: lic_1 = st.text_input("Lic No 1 *").upper().strip()
-            with col2: lic_2 = st.text_input("Lic No 2 - Optional").upper().strip()
-            addr_1 = st.text_input("Address Line 1 *").upper().strip()
-            addr_2 = st.text_input("Address Line 2 *").upper().strip()
+            with col1: lic_1 = st.text_input("Lic No 1 *", value="").upper().strip()
+            with col2: lic_2 = st.text_input("Lic No 2 - Optional", value="").upper().strip()
+            addr_1 = st.text_input("Address Line 1 *", value="").upper().strip()
+            addr_2 = st.text_input("Address Line 2 *", value="").upper().strip()
             
             submit_btn = st.form_submit_button("Create Account & Login To App", type="primary", use_container_width=True)
             
@@ -157,11 +142,6 @@ if not st.session_state.is_logged_in:
                         }
                         st.session_state.is_logged_in = True
                         st.session_state.bill_no = "100"
-                        
-                        try:
-                            with open(SESSION_FILE, "w") as f:
-                                json.dump({"username": generated_id, "password": default_password}, f)
-                        except: pass
                         
                         st.query_params["id"] = generated_id
                         st.success("Account created successfully!")
@@ -222,16 +202,14 @@ if st.sidebar.button("🔌 Check Supabase Cloud Connection"):
         st.sidebar.error(f"❌ Connection Error: {e}")
 
 # =======================================================================
-# 🔗 GOOGLE DRIVE SYNC SECTION (ఇక్కడ కోడ్ మరియు ఇండెంటేషన్ సరిచేసాం)
+# 🔗 GOOGLE DRIVE SYNC SECTION 
 # =======================================================================
 st.sidebar.write("---")
 st.sidebar.markdown("### 📁 Google Drive Backup")
 
-# ✅ కరెక్ట్ పద్ధతి: డిక్షనరీ లోపల ఉన్న Username ని తెచ్చుకోవడం
 drive_username = st.session_state.get("user_profile", {}).get("Username")
 
 if drive_username:
-    # 1. గూగుల్ నుండి తిరిగి వచ్చే కోడ్ ని పట్టుకుని సుపాబేస్ లో సేవ్ చేసే లాజిక్
     if "code" in st.query_params:
         auth_code = st.query_params["code"]
         try:
@@ -247,15 +225,14 @@ if drive_username:
             refresh_token = token_response.get("refresh_token")
             
             if refresh_token:
-                # సుపాబేస్ డేటాబేస్ లో టోకెన్ సేవ్ చేయడం
                 supabase_client.table("users").update({"google_refresh_token": refresh_token}).eq("username", drive_username).execute()
                 st.sidebar.success("🎉 Google Drive connected successfully!")
                 st.query_params.clear()
+                st.query_params["id"] = drive_username
                 st.rerun()
         except Exception as e:
             st.sidebar.error(f"❌ Token Exchange Error: {e}")
 
-    # 2. సుపాబేస్ లో ఆల్రెడీ టోకెన్ ఉందో లేదో చెక్ చేసి బటన్/స్టేటస్ చూపించడం
     try:
         db_res = supabase_client.table("users").select("google_refresh_token").eq("username", drive_username).execute()
         if db_res.data and db_res.data[0].get("google_refresh_token"):
@@ -280,11 +257,9 @@ if drive_username:
 
 if st.sidebar.button("Logout Account"):
     st.session_state.is_logged_in = False
-    if os.path.exists(SESSION_FILE): os.remove(SESSION_FILE)
     st.query_params.clear()
     st.rerun()
 
-# 🌟 ఇప్పుడు current_user డిక్షనరీ గానే సురక్షితంగా ఉంటుంది కాబట్టి ఎర్రర్ రాదు!
 st.sidebar.info(f"ID: {current_user.get('Username')}")
 
 from billing_dashboard import show_billing_dashboard
