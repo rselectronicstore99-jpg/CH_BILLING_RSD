@@ -27,7 +27,7 @@ def get_supabase_client() -> Client:
             url = st.secrets["supabase"]["url"]
             key = st.secrets["supabase"]["key"]
             return create_client(url, key)
-    except Exception as e:
+    except:
         pass
     return None
 
@@ -38,9 +38,12 @@ def load_json(file_path, default_value=None):
     if default_value is None:
         default_value = []
         
-    filename = os.path.basename(file_path)
-    temp_path = os.path.join(tempfile.gettempdir(), filename)
-    current_user = st.session_state.get("user_profile", {}).get("Username", "")
+    # 🔥 FIX: కేస్-సెన్సిటివిటీ మరియు స్పేస్ బైపాస్ సమస్యలు రాకుండా క్లీన్ చేస్తున్నాం
+    filename = os.path.basename(file_path).lower().strip()
+    temp_path = os.path.join(tempfile.gettempdir(), os.path.basename(file_path))
+    
+    # యూజర్‌నేమ్ ని కూడా ఇరువైపులా స్పేసెస్ లేకుండా క్లీన్ గా తీసుకుంటున్నాం
+    current_user = str(st.session_state.get("user_profile", {}).get("Username", "")).strip()
 
     # 1. ఒకవేళ సుపాబేస్ క్లౌడ్ అందుబాటులో ఉంటే (Cloud Fetch)
     if supabase_client:
@@ -69,8 +72,8 @@ def load_json(file_path, default_value=None):
                             h["Username"] = row["username"]
                         cloud_data.append(h)
                 return cloud_data
-        except Exception as e:
-            # క్లౌడ్ డేటాబేస్ డౌన్ అయితేనే కింద ఉన్న లోకల్ సిస్టమ్ కి వెళ్తుంది
+        except:
+            # క్లౌడ్ డేటాబేస్ ఎర్రర్ వస్తే లోకల్ ఫాల్‌బ్యాక్ కి వెళ్తుంది
             pass
 
     # 2. లోకల్ ఫాల్‌బ్యాక్ సిస్టమ్ (సుపాబేస్ డౌన్ అయినప్పుడు లేదా ఇంటర్నెట్ లేనప్పుడు)
@@ -87,7 +90,7 @@ def load_json(file_path, default_value=None):
         except: pass
 
     # 🔥 CRITICAL LOCAL FILTER FIX: 
-    # సుపాబేస్ డౌన్ అయినా సరే, లోకల్ హిస్టరీ ఫైల్ లో నుండి కేవలం లాగిన్ అయిన యూజర్ డేటా మాత్రమే ఫిల్టర్ చేసి పంపుతుంది!
+    # ఇక్కడ కూడా క్లీన్ చేసిన ఫైల్ నేమ్ తో స్ట్రిక్ట్ ఫిల్టర్ అప్లై చేసాం, కాబట్టి డేటా లీక్ అయ్యే ఛాన్సే లేదు!
     if filename == "history.json" and isinstance(local_data, list):
         if not current_user:
             return []
@@ -95,17 +98,18 @@ def load_json(file_path, default_value=None):
             filtered_local = []
             for r in local_data:
                 if isinstance(r, dict):
-                    r_user = r.get('username') or r.get('user_id') or r.get('Username')
-                    if str(r_user).strip() == str(current_user).strip():
+                    r_user = str(r.get('username') or r.get('user_id') or r.get('Username') or "").strip()
+                    if r_user == current_user:
                         filtered_local.append(r)
             return filtered_local
 
     return local_data
 
-# 📤 సుపాబేస్ లోకి డేటాను రైట్ చేసే ఫంక్షన్
+# 📤 సుపాబేస్ లోకల్ మరియు క్లౌడ్ లోకి డేటాను రైట్ చేసే ఫంక్షన్
 def save_json(file_path, data):
-    filename = os.path.basename(file_path)
-    temp_path = os.path.join(tempfile.gettempdir(), filename)
+    # 🔥 FIX: ఇక్కడ కూడా ఫైల్ నేమ్ ని క్లీన్ చేస్తున్నాం
+    filename = os.path.basename(file_path).lower().strip()
+    temp_path = os.path.join(tempfile.gettempdir(), os.path.basename(file_path))
     local_saved = False
 
     try:
@@ -122,16 +126,16 @@ def save_json(file_path, data):
     if supabase_client:
         try:
             if filename == "users.json":
-                payload = [{"username": u["Username"], "data": u} for u in data]
+                payload = [{"username": str(u["Username"]).strip(), "data": u} for u in data]
                 supabase_client.table("users").upsert(payload).execute()
                 return True
                 
             elif filename == "history.json":
-                current_user = st.session_state.get("user_profile", {}).get("Username", "unknown")
+                current_user = str(st.session_state.get("user_profile", {}).get("Username", "unknown")).strip()
                 payload = []
                 for h in data:
                     if not isinstance(h, dict): continue
-                    uname = h.get('username') or h.get('user_id') or h.get('Username') or current_user
+                    uname = str(h.get('username') or h.get('user_id') or h.get('Username') or current_user).strip()
                     bno = str(h.get('bill_no') or "100")
                     
                     h['username'] = uname
@@ -150,7 +154,7 @@ def save_json(file_path, data):
                 if payload:
                     supabase_client.table("history").upsert(payload).execute()
                 return True
-        except Exception as e:
+        except:
             pass
             
     return local_saved
@@ -175,7 +179,7 @@ def register_system_customer(system_id, password, phone, shop_name, lic_1, lic_2
         }
         users.append(new_user)
         return save_json(USERS_FILE, users)
-    except Exception as e:
+    except:
         return False
 
 # Google Drive Backup ఫంక్షన్లు
@@ -204,13 +208,18 @@ def upload_to_client_google_drive(file_path, client_refresh_token):
 
 def upload_to_drive(file_path):
     try:
-        current_user = st.session_state.get("user_profile", {}).get("Username", "")
+        # 🔥 FIX: ఒకవేళ సుపాబేస్ క్లయింట్ లేకపోతే ఇక్కడే రిటర్న్ అవుతుంది, క్రాష్ అవ్వదు
+        if not supabase_client:
+            return False
+            
+        current_user = str(st.session_state.get("user_profile", {}).get("Username", "")).strip()
         if not current_user:
             return False
+            
         response = supabase_client.table("users").select("google_refresh_token").eq("username", current_user).execute()
         if response.data and response.data[0].get("google_refresh_token"):
             token = response.data[0]["google_refresh_token"]
             return upload_to_client_google_drive(file_path, token)
         return False
-    except Exception as e:
+    except:
         return False

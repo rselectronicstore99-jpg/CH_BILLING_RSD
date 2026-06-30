@@ -2,6 +2,7 @@ import streamlit as st
 import os
 import json
 import requests
+import hashlib
 from datetime import datetime, date, timedelta
 # 🌟 database నుండి ఇంపోర్ట్స్
 from database import load_json, save_json, USERS_FILE, HISTORY_FILE, generate_system_id, register_system_customer, calculate_valid_key, supabase_client
@@ -27,13 +28,13 @@ def init_session_state_safe():
 
 init_session_state_safe()
 
-# 🔄 ప్యూర్ నంబర్ బిల్లుల కోసం స్మార్ట్ ఆటో-ఇంక్రిమెంట్ ఫంక్షన్
+# 🔄 ప్యూర్ నంబర్ బిల్లుల కోసం స్మార్ట్ ఆటో-ఇంక్రిメント ఫంక్షన్
 def set_next_bill_no_for_user(username):
     history_records = load_json(HISTORY_FILE, [])
     user_bill_numbers = []
     for r in history_records:
         r_user = r.get('username') or r.get('user_id') or r.get('Username')
-        if str(r_user).strip() == str(username).strip():
+        if str(r_user).strip().upper() == str(username).strip().upper():
             try: 
                 bno = r.get('bill_no')
                 if bno is not None:
@@ -46,23 +47,26 @@ def set_next_bill_no_for_user(username):
 
 url_params = st.query_params
 url_id = url_params.get("id", None)
+url_auth = url_params.get("auth", None)
 
-# 🔄 సురక్షితమైన URL ఆటో-లాగిన్ మేనేజ్మెంట్ (session.json పూర్తిగా తొలగించబడింది)
-if not st.session_state.is_logged_in and url_id:
-    users = load_json(USERS_FILE, [])
-    user_found = None
-    
-    for u in users:
-        if str(u.get('Username')).strip() == str(url_id).strip():
-            user_found = u
-            break
-            
-    if user_found:
-        if str(user_found.get('Status', '')).upper() not in ["CLOSED", "EXPIRED"]:
-            st.session_state.is_logged_in = True
-            st.session_state.user_profile = user_found
-            set_next_bill_no_for_user(user_found["Username"])
-            st.rerun()
+# 🔄 సురక్షితమైన URL ఆటో-లాగిన్ మేనేజ్మెంట్ (🔐 Auth Key తో పక్కా 100% సెక్యూరిటీ బూస్ట్)
+if not st.session_state.is_logged_in and url_id and url_auth:
+    # సీక్రెట్ సాల్ట్ తో జనరేట్ అయిన హాష్ టోకెన్ మ్యాచ్ అయితేనే లోపలికి రానిస్తుంది
+    if str(url_auth).strip() == calculate_valid_key(url_id):
+        users = load_json(USERS_FILE, [])
+        user_found = None
+        
+        for u in users:
+            if str(u.get('Username')).strip().upper() == str(url_id).strip().upper():
+                user_found = u
+                break
+                
+        if user_found:
+            if str(user_found.get('Status', '')).upper() not in ["CLOSED", "EXPIRED"]:
+                st.session_state.is_logged_in = True
+                st.session_state.user_profile = user_found
+                set_next_bill_no_for_user(user_found["Username"])
+                st.rerun()
 
 if not st.session_state.is_logged_in:
     st.title("RS Electronic Ultimate")
@@ -78,7 +82,7 @@ if not st.session_state.is_logged_in:
             login_submit = st.form_submit_button("Login to App", use_container_width=True)
             
             if login_submit:
-                if login_user == "admin" and login_pass == "rs2026":
+                if login_user.lower() == "admin" and login_pass == "rs2026":
                     st.session_state.is_logged_in = True
                     st.session_state.user_profile = {
                         "Username": "admin", "Key_Type": "Lifetime", "Shop_Name": "RS ELECTRONICS DEVELOPER",
@@ -91,7 +95,8 @@ if not st.session_state.is_logged_in:
                     users = load_json(USERS_FILE, [])
                     user_matched = None
                     for u in users:
-                        if str(u.get('Username')).strip() == login_user and str(u.get('Password')).strip() == login_pass:
+                        # 🔥 FIX: కేస్-సెన్సిటివిటీ వల్ల లాగిన్ ఫెయిల్ అవ్వకుండా .upper() చేసాం
+                        if str(u.get('Username')).strip().upper() == login_user.upper() and str(u.get('Password')).strip() == login_pass:
                             user_matched = u
                             break
                     if user_matched:
@@ -99,8 +104,9 @@ if not st.session_state.is_logged_in:
                         st.session_state.user_profile = user_matched
                         set_next_bill_no_for_user(user_matched["Username"])
                         
-                        # URL లో ఐడి ని సెట్ చేస్తుంది, దీనివల్ల ఈ బ్రౌజర్ ట్యాబ్ కి మాత్రమే ఆటో-లాగిన్ అవుతుంది
-                        st.query_params["id"] = login_user
+                        # URL లో ఐడి మరియు సెక్యూర్ ఆథరైజేషన్ టోకెన్ రెండింటినీ సెట్ చేస్తుంది
+                        st.query_params["id"] = user_matched["Username"]
+                        st.query_params["auth"] = calculate_valid_key(user_matched["Username"])
                         st.success("Login successful!")
                         st.rerun()
                     else:
@@ -109,7 +115,6 @@ if not st.session_state.is_logged_in:
     with tab2:
         st.subheader("Shop Details Setup & Registration")
         with st.form("shop_registration_form"):
-            # ఇన్‌పుట్ బాక్సులను కొత్త క్లయింట్ల కోసం పూర్తిగా ఖాళీగా (Empty) ఉంచాం
             shop_name = st.text_input("Shop Name *", value="").upper().strip()
             phone = st.text_input("Phone Number *", value="").strip()
             col1, col2 = st.columns(2)
@@ -144,6 +149,7 @@ if not st.session_state.is_logged_in:
                         st.session_state.bill_no = "100"
                         
                         st.query_params["id"] = generated_id
+                        st.query_params["auth"] = calculate_valid_key(generated_id)
                         st.success("Account created successfully!")
                         st.rerun()
                     else:
@@ -212,6 +218,12 @@ drive_username = st.session_state.get("user_profile", {}).get("Username")
 if drive_username:
     if "code" in st.query_params:
         auth_code = st.query_params["code"]
+        
+        # 🔥 FIX: ఇన్ఫినిట్ రీడైరెక్ట్ లూప్ ని నివారించడానికి URL నుండి కోడ్‌ని వెంటనే క్లియర్ చేసి సెక్యూర్ కీస్ ఉంచుతున్నాం
+        st.query_params.clear()
+        st.query_params["id"] = drive_username
+        st.query_params["auth"] = calculate_valid_key(drive_username)
+        
         try:
             token_url = "https://oauth2.googleapis.com/token"
             token_data = {
@@ -227,9 +239,9 @@ if drive_username:
             if refresh_token:
                 supabase_client.table("users").update({"google_refresh_token": refresh_token}).eq("username", drive_username).execute()
                 st.sidebar.success("🎉 Google Drive connected successfully!")
-                st.query_params.clear()
-                st.query_params["id"] = drive_username
                 st.rerun()
+            else:
+                st.sidebar.error("❌ Refresh token లభించలేదు! Google Account Permissions లో యాప్ ని డిస్‌కనెక్ట్ చేసి మళ్ళీ కనెక్ట్ చేయండి.")
         except Exception as e:
             st.sidebar.error(f"❌ Token Exchange Error: {e}")
 
