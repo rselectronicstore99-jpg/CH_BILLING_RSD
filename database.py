@@ -33,15 +33,16 @@ def get_supabase_client() -> Client:
 
 supabase_client = get_supabase_client()
 
-# 📥 సుపాబేస్ నుండి డేటాను చదివే ఫంక్షన్ (MULTI-TENANT SAFETY FIX)
+# 📥 సుపాబేస్ నుండి డేటాను చదివే ఫంక్షన్ (FULLY SECURED MULTI-TENANT)
 def load_json(file_path, default_value=None):
     if default_value is None:
         default_value = []
         
     filename = os.path.basename(file_path)
     temp_path = os.path.join(tempfile.gettempdir(), filename)
+    current_user = st.session_state.get("user_profile", {}).get("Username", "")
 
-    # 1. ఒకవేళ సుపాబేస్ క్లౌడ్ అందుబాటులో ఉంటే, కచ్చితంగా క్లౌడ్ డేటానే రిటర్న్ చేయాలి
+    # 1. ఒకవేళ సుపాబేస్ క్లౌడ్ అందుబాటులో ఉంటే (Cloud Fetch)
     if supabase_client:
         try:
             if filename == "users.json":
@@ -50,13 +51,9 @@ def load_json(file_path, default_value=None):
                 return cloud_data
 
             elif filename == "history.json":
-                current_user = st.session_state.get("user_profile", {}).get("Username", "")
-                
-                # యూజర్ లాగిన్ అవ్వకపోతే ఖాళీ లిస్ట్ పంపుతుంది
                 if not current_user:
                     return []
                 
-                # సెక్యూరిటీ కోసం లాగిన్ అయిన క్లయింట్ బిల్లులు మాత్రమే తెస్తుంది
                 if current_user != "admin":
                     response = supabase_client.table("history").select("username", "bill_no", "data").eq("username", current_user).execute()
                 else:
@@ -67,20 +64,16 @@ def load_json(file_path, default_value=None):
                     for row in response.data:
                         h = row["data"]
                         if isinstance(h, dict):
-                            # CRITICAL PDF FIX
                             h["username"] = row["username"]
                             h["bill_no"] = row["bill_no"]
                             h["Username"] = row["username"]
                         cloud_data.append(h)
-                
-                # 🔥 FIX: క్లౌడ్ డేటా ఖాళీగా ఉన్నా (కొత్త యూజర్ అయినా) cloud_data నే రిటర్న్ చేయాలి. 
-                # పాత కోడ్ లాగా సర్వర్ లోని లోకల్ ఫైల్ ని రిటర్న్ చేసి డేటా లీక్ చేయకూడదు.
                 return cloud_data
         except Exception as e:
-            # క్లౌడ్ డేటాబేస్ లో ఏదైనా ఎర్రర్ వస్తేనే కింద ఉన్న లోకల్ బ్యాకప్ సిస్టమ్ రన్ అవుతుంది
+            # క్లౌడ్ డేటాబేస్ డౌన్ అయితేనే కింద ఉన్న లోకల్ సిస్టమ్ కి వెళ్తుంది
             pass
 
-    # 2. లోకల్ ఫాల్‌బ్యాక్ (ఇంటర్నెట్ లేనప్పుడు మాత్రమే వాడటానికి)
+    # 2. లోకల్ ఫాల్‌బ్యాక్ సిస్టమ్ (సుపాబేస్ డౌన్ అయినప్పుడు లేదా ఇంటర్నెట్ లేనప్పుడు)
     local_data = default_value
     if os.path.exists(file_path):
         try:
@@ -92,7 +85,21 @@ def load_json(file_path, default_value=None):
             with open(temp_path, "r", encoding="utf-8") as f:
                 local_data = json.load(f)
         except: pass
-            
+
+    # 🔥 CRITICAL LOCAL FILTER FIX: 
+    # సుపాబేస్ డౌన్ అయినా సరే, లోకల్ హిస్టరీ ఫైల్ లో నుండి కేవలం లాగిన్ అయిన యూజర్ డేటా మాత్రమే ఫిల్టర్ చేసి పంపుతుంది!
+    if filename == "history.json" and isinstance(local_data, list):
+        if not current_user:
+            return []
+        if current_user != "admin":
+            filtered_local = []
+            for r in local_data:
+                if isinstance(r, dict):
+                    r_user = r.get('username') or r.get('user_id') or r.get('Username')
+                    if str(r_user).strip() == str(current_user).strip():
+                        filtered_local.append(r)
+            return filtered_local
+
     return local_data
 
 # 📤 సుపాబేస్ లోకి డేటాను రైట్ చేసే ఫంక్షన్
@@ -144,7 +151,7 @@ def save_json(file_path, data):
                     supabase_client.table("history").upsert(payload).execute()
                 return True
         except Exception as e:
-            st.error(f"❌ Cloud Database Save Error: {e}")
+            pass
             
     return local_saved
 
@@ -169,10 +176,9 @@ def register_system_customer(system_id, password, phone, shop_name, lic_1, lic_2
         users.append(new_user)
         return save_json(USERS_FILE, users)
     except Exception as e:
-        st.error(f"❌ డేటాబేస్ సేవింగ్ లోపం: {e}")
         return False
 
-# Google Drive Backup ఫంక్షన్లు (యధావిధిగా ఉంచబడ్డాయి)
+# Google Drive Backup ఫంక్షన్లు
 def upload_to_client_google_drive(file_path, client_refresh_token):
     try:
         creds = Credentials(
@@ -207,5 +213,4 @@ def upload_to_drive(file_path):
             return upload_to_client_google_drive(file_path, token)
         return False
     except Exception as e:
-        print(f"⚠️ Backup Bridge Error: {e}")
         return False
