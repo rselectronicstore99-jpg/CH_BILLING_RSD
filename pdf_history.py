@@ -64,7 +64,7 @@ def import_history_to_session_callback(record):
 
 
 # 📄 pdf_history.py లో ఈ ఫంక్షన్‌ను అప్‌డేట్ చేయండి
-def show_history_log_section():
+def show_history_log_section(current_user=None):
     st.markdown("### 📅 Filter & Search History Logs")
     all_records = load_json(HISTORY_FILE, [])
     
