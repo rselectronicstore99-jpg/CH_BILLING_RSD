@@ -63,9 +63,26 @@ def import_history_to_session_callback(record):
     st.session_state.import_success_trigger = True
 
 
-def show_history_log_section():
+# 📄 pdf_history.py లో ఈ ఫంక్షన్‌ను అప్‌డేట్ చేయండి
+def show_history_log_section(current_user=None):
     st.markdown("### 📅 Filter & Search History Logs")
-    history_records = load_json(HISTORY_FILE, [])
+    all_records = load_json(HISTORY_FILE, []) # అన్ని రికార్డులను లోడ్ చేస్తుంది
+    
+    # 🔒 సెక్యూరిటీ ఫిల్టర్: ప్రస్తుతం లాగిన్ అయిన యూజర్ ప్రొఫైల్ ఐడిని పొందడం
+    if not current_user and "user_profile" in st.session_state:
+        current_user = st.session_state.user_profile
+        
+    logged_in_username = str(current_user.get('Username', '')).strip().upper() if current_user else ""
+    
+    # యూజర్ 'ADMIN' కాకపోతే, కేవలం వారి రికార్డులను మాత్రమే చూపిస్తుంది
+    if logged_in_username and logged_in_username != "ADMIN":
+        history_records = [
+            r for r in all_records 
+            if str(r.get('username') or r.get('user_id') or r.get('Username', '')).strip().upper() == logged_in_username
+        ]
+    else:
+        # ఒకవేళ అడ్మిన్ లాగిన్ అయితే అన్ని రికార్డులు కనిపిస్తాయి
+        history_records = all_records
     
     if st.session_state.get("import_success_trigger"):
         st.success("🎉 డేటా విజయవంతంగా ఇంపోర్ట్ చేయబడింది! దయచేసి 'CREATE CHALLANA' ట్యాబ్ ఓపెన్ చేసి చూడండి.")
