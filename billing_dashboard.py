@@ -159,10 +159,15 @@ def show_billing_dashboard(current_user):
 
         # ✨ [NEW FEATURE]: SUB ACCOUNT WIDGET ROW
         st.markdown("---")
+        
+        # 🔒 కేవలం ఈ యూజర్ క్రియేట్ చేసిన SUB అకౌంట్స్ మాత్రమే డ్రాప్‌డౌన్‌లో వచ్చేలా ఫిల్టర్
+        logged_in_username = str(current_user.get('Username', '')).strip().upper()
         existing_subs = sorted(list(set([
             str(r.get('sub_client', '')).strip().upper() 
-            for r in history_records if r.get('sub_client')
+            for r in history_records 
+            if r.get('sub_client') and (logged_in_username == "ADMIN" or str(r.get('username') or r.get('user_id') or r.get('Username', '')).strip().upper() == logged_in_username)
         ])))
+        
         col_sub1, col_sub2 = st.columns([3.8, 1.2])
         with col_sub1:
             final_sub = render_smart_input("SUB: (Account / Salesman Name)", existing_subs, "sub")
@@ -278,7 +283,7 @@ def show_billing_dashboard(current_user):
 
     # ---- 📅 ట్యాబ్ 2: హిస్టరీ ----
     with tab_history:
-        show_history_log_section()
+        show_history_log_section(current_user)
 
     # ---- ⚙️ ట్యాబ్ 3: SHOP SETTINGS ----
     with tab_settings:
