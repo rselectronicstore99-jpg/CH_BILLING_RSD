@@ -64,39 +64,49 @@ def import_history_to_session_callback(record):
 
 
 # 📄 pdf_history.py లో ఈ ఫంక్షన్‌ను అప్‌డేట్ చేయండి
-def show_history_log_section(current_user=None):
+def show_history_log_section():
     st.markdown("### 📅 Filter & Search History Logs")
-    history_records_all = load_json(HISTORY_FILE, []) #[cite: 7]
+    all_records = load_json(HISTORY_FILE, [])
     
-    # 🔒 100% సెక్యూర్ కేస్-ఇన్సెన్సిటివ్ ఫిల్టర్
-    if not current_user and "user_profile" in st.session_state:
-        current_user = st.session_state.user_profile
-        
-    logged_in_user = str(current_user.get('Username', '')).strip().upper() if current_user else ""
+    # 🔒 ఇంకొక పద్ధతి: డైరెక్ట్‌గా స్ట్రీమ్‌లిట్ గ్లోబల్ మెమొరీ నుండి యూజర్‌ను పట్టుకోవడం
+    logged_in_user = ""
     
-    # యూజర్ ADMIN కాకపోతే, కేవలం అతని CH- ఐడి రికార్డులను మాత్రమే ఫిల్టర్ చేస్తుంది
+    # మీ యాప్‌లో లాగిన్ ఐడి ఏ పేరుతో సేవ్ అయిందో అన్నింటినీ ఇక్కడ చెక్ చేస్తుంది
+    if "user_profile" in st.session_state and st.session_state.user_profile:
+        logged_in_user = str(st.session_state.user_profile.get('Username', '')).strip().upper()
+    elif "username" in st.session_state:
+        logged_in_user = str(st.session_state.username).strip().upper()
+    elif "user_id" in st.session_state:
+        logged_in_user = str(st.session_state.user_id).strip().upper()
+
+    # 🛠️ టెంపరరీ డిబగ్గర్ (యాప్ కరెక్ట్‌గా పనిచేసాక ఈ కింద లైన్ తీసేయవచ్చు)
+    # st.sidebar.write(f"Logged in as: `{logged_in_user}`")
+
+    # 🛡️ సెక్యూరిటీ ఫిల్టర్: ఒకవేళ అడ్మిన్ కాకపోతే, కేవలం ఆ క్లయింట్ బిల్లులు మాత్రమే చూపిస్తుంది
     if logged_in_user and logged_in_user != "ADMIN":
         history_records = [
-            r for r in history_records_all
-            if str(r.get('username') or r.get('Username') or '').strip().upper() == logged_in_user
+            r for r in all_records 
+            if str(r.get('username') or r.get('Username') or r.get('user_id') or '').strip().upper() == logged_in_user
         ]
     else:
-        history_records = history_records_all
+        # ఒకవేళ ADMIN లాగిన్ అయితే అందరి డేటా కనిపిస్తుంది
+        history_records = all_records
     
+    # --- ఇక్కడి నుండి మిగతా కోడ్ అంతా మామూలే ---
     if st.session_state.get("import_success_trigger"):
-        st.success("🎉 డేటా విజయవంతంగా ఇంపోర్ట్ చేయబడింది! దయచేసి 'CREATE CHALLANA' ట్యాబ్ ఓపెన్ చేసి చూడండి.")
-        st.session_state.import_success_trigger = False #[cite: 7]
+        st.success("🎉 డేటా విజయవంతంగా ఇంపోర్ట్ చేయబడింది! దయచేసి 'CREATE CHALLANA' ట్యాబ్ ఓపెン చేసి చూడండి.")
+        st.session_state.import_success_trigger = False
     
     if not history_records:
         st.info("ఈ ఆర్థిక సంవత్సరానికి ఎటువంటి హిస్టరీ డేటా రికార్డ్ అవ్వలేదు.")
-        return #[cite: 7]
+        return
 
     alert_templates = [
         "Dear Customer, your weighing scale stamping renewal is due. Please contact immediately.",
         "నమస్కారం, మీ షాప్ కాటా ముద్ర గడువు ముగియనుంది. త్వరగా రిన్యూవల్ చేసుకోగలరు."
-    ] #[cite: 7]
+    ]
 
-    default_start_date = datetime.now().date() #[cite: 7]
+    default_start_date = datetime.now().date()
     if history_records:
         parsed_dates = []
         for record in history_records:
@@ -104,30 +114,29 @@ def show_history_log_section(current_user=None):
                 d = datetime.strptime(record.get('date', ''), '%d-%m-%Y').date()
                 parsed_dates.append(d)
             except: pass
-        if parsed_dates: default_start_date = min(parsed_dates) #[cite: 7]
+        if parsed_dates: default_start_date = min(parsed_dates)
 
-    col_d1, col_d2 = st.columns(2) #[cite: 7]
+    col_d1, col_d2 = st.columns(2)
     with col_d1: start_date = st.date_input("From Date", value=default_start_date)
-    with col_d2: end_date = st.date_input("To Date", value=datetime.now().date()) #[cite: 7]
+    with col_d2: end_date = st.date_input("To Date", value=datetime.now().date())
         
     user_subs = sorted(list(set([
         str(r.get('sub_client', '')).strip().upper() 
         for r in history_records if r.get('sub_client')
-    ]))) #[cite: 7]
+    ])))
     filter_sub = st.selectbox("🗂️ Filter by SUB Account (Salesman)", ["ALL SUB CUSTOMERS"] + user_subs)
 
-    col_s1, col_s2, col_s3 = st.columns(3) #[cite: 7]
+    col_s1, col_s2, col_s3 = st.columns(3)
     with col_s1: search_name = st.text_input("👤 Search Customer Name").strip().upper()
     with col_s2: search_phone = st.text_input("📞 Search Phone Number").strip()
-    with col_s3: search_bill = st.text_input("🧾 Search Bill Number").strip() #[cite: 7]
+    with col_s3: search_bill = st.text_input("🧾 Search Bill Number").strip()
         
     filtered_records = []
-    is_searching = bool(search_name or search_phone or search_bill) #[cite: 7]
+    is_searching = bool(search_name or search_phone or search_bill)
 
     for record in history_records:
         if filter_sub != "ALL SUB CUSTOMERS":
-            if str(record.get('sub_client', '')).strip().upper() != filter_sub:
-                continue
+            if str(record.get('sub_client', '')).strip().upper() != filter_sub: continue
             
         if not is_searching:
             try:
@@ -138,10 +147,10 @@ def show_history_log_section(current_user=None):
         if search_name and search_name not in record.get('name', '').upper(): continue
         if search_phone and search_phone not in record.get('phone', ''): continue
         if search_bill and search_bill not in record.get('bill_no', ''): continue
-        filtered_records.append(record) #[cite: 7]
+        filtered_records.append(record)
             
     st.markdown(f"🔍 లభించిన రికార్డులు: **{len(filtered_records)}**")
-    tab1, tab2 = st.tabs(["📋 DETAILED HISTORY LOGS", "📲 QUICK WHATSAPP LIST"]) #[cite: 7]
+    tab1, tab2 = st.tabs(["📋 DETAILED HISTORY LOGS", "📲 QUICK WHATSAPP LIST"])
     
     with tab1:
         for idx, record in enumerate(reversed(filtered_records)):
@@ -164,7 +173,7 @@ def show_history_log_section(current_user=None):
                         args=(record,)
                     )
                 with col_b2:
-                    st.link_button("📲 SEND WHATSAPP REMINDER", wa_url, use_container_width=True) #[cite: 7]
+                    st.link_button("📲 SEND WHATSAPP REMINDER", wa_url, use_container_width=True)
 
     with tab2:
         st.markdown("#### ⚡ Fast WhatsApp Reminder Panel")
@@ -176,7 +185,7 @@ def show_history_log_section(current_user=None):
             col3.write(record.get('phone', ''))
             col4.write(record.get('town', ''))
             quick_wa_url = f"https://wa.me/91{record.get('phone')}?text={urllib.parse.quote(global_template)}"
-            col5.link_button("📲 SEND WA", quick_wa_url, use_container_width=True, key=f"qwa_{idx}") #[cite: 7]
+            col5.link_button("📲 SEND WA", quick_wa_url, use_container_width=True, key=f"qwa_{idx}")
 
 def generate_challana_pdf(bill_no, bill_date, final_jurisdiction, cust_name, final_trade, cust_pro, cust_area, final_town, final_vlg, final_pin, grand_total, current_user):
     pdf_filename = os.path.join(BASE_DIR, f"CH_{bill_no}.pdf")
