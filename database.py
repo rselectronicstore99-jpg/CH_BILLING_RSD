@@ -6,7 +6,6 @@ import tempfile
 from datetime import datetime, timedelta
 import streamlit as st
 from supabase import create_client, Client
-# database.py కి పైన ఈ ఇంపోర్ట్స్ యాడ్ చేయండి
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
@@ -34,15 +33,55 @@ def get_supabase_client() -> Client:
 
 supabase_client = get_supabase_client()
 
-# 📥 సుపాబేస్ నుండి డేటాను చదివే ఫంక్షన్ (PDF & HISTORY FIX)
+# 📥 సుపాబేస్ నుండి డేటాను చదివే ఫంక్షన్ (MULTI-TENANT SAFETY FIX)
 def load_json(file_path, default_value=None):
     if default_value is None:
         default_value = []
         
     filename = os.path.basename(file_path)
     temp_path = os.path.join(tempfile.gettempdir(), filename)
-    local_data = default_value
 
+    # 1. ఒకవేళ సుపాబేస్ క్లౌడ్ అందుబాటులో ఉంటే, కచ్చితంగా క్లౌడ్ డేటానే రిటర్న్ చేయాలి
+    if supabase_client:
+        try:
+            if filename == "users.json":
+                response = supabase_client.table("users").select("data").execute()
+                cloud_data = [row["data"] for row in response.data] if response.data else []
+                return cloud_data
+
+            elif filename == "history.json":
+                current_user = st.session_state.get("user_profile", {}).get("Username", "")
+                
+                # యూజర్ లాగిన్ అవ్వకపోతే ఖాళీ లిస్ట్ పంపుతుంది
+                if not current_user:
+                    return []
+                
+                # సెక్యూరిటీ కోసం లాగిన్ అయిన క్లయింట్ బిల్లులు మాత్రమే తెస్తుంది
+                if current_user != "admin":
+                    response = supabase_client.table("history").select("username", "bill_no", "data").eq("username", current_user).execute()
+                else:
+                    response = supabase_client.table("history").select("username", "bill_no", "data").execute()
+                    
+                cloud_data = []
+                if response and response.data:
+                    for row in response.data:
+                        h = row["data"]
+                        if isinstance(h, dict):
+                            # CRITICAL PDF FIX
+                            h["username"] = row["username"]
+                            h["bill_no"] = row["bill_no"]
+                            h["Username"] = row["username"]
+                        cloud_data.append(h)
+                
+                # 🔥 FIX: క్లౌడ్ డేటా ఖాళీగా ఉన్నా (కొత్త యూజర్ అయినా) cloud_data నే రిటర్న్ చేయాలి. 
+                # పాత కోడ్ లాగా సర్వర్ లోని లోకల్ ఫైల్ ని రిటర్న్ చేసి డేటా లీక్ చేయకూడదు.
+                return cloud_data
+        except Exception as e:
+            # క్లౌడ్ డేటాబేస్ లో ఏదైనా ఎర్రర్ వస్తేనే కింద ఉన్న లోకల్ బ్యాకప్ సిస్టమ్ రన్ అవుతుంది
+            pass
+
+    # 2. లోకల్ ఫాల్‌బ్యాక్ (ఇంటర్నెట్ లేనప్పుడు మాత్రమే వాడటానికి)
+    local_data = default_value
     if os.path.exists(file_path):
         try:
             with open(file_path, "r", encoding="utf-8") as f:
@@ -53,49 +92,6 @@ def load_json(file_path, default_value=None):
             with open(temp_path, "r", encoding="utf-8") as f:
                 local_data = json.load(f)
         except: pass
-
-    if supabase_client:
-        try:
-            if filename == "users.json":
-                response = supabase_client.table("users").select("data").execute()
-                cloud_data = [row["data"] for row in response.data] if response.data else []
-                for path in [file_path, temp_path]:
-                    try:
-                        with open(path, "w", encoding="utf-8") as f:
-                            json.dump(cloud_data, f, indent=4, ensure_ascii=False)
-                    except: pass
-                return cloud_data
-
-            elif filename == "history.json":
-                current_user = st.session_state.get("user_profile", {}).get("Username", "")
-                
-                # సెక్యూరిటీ మరియు ఖచ్చితత్వం కోసం లాగిన్ అయిన క్లయింట్ బిల్లులు మాత్రమే తెస్తుంది
-                if current_user and current_user != "admin":
-                    response = supabase_client.table("history").select("username", "bill_no", "data").eq("username", current_user).execute()
-                else:
-                    response = supabase_client.table("history").select("username", "bill_no", "data").execute()
-                    
-                cloud_data = []
-                if response and response.data:
-                    for row in response.data:
-                        h = row["data"]
-                        if isinstance(h, dict):
-                            # 🔥 CRITICAL PDF FIX: క్లౌడ్ నుండి తెచ్చేటప్పుడు బిల్ లోపల 'username' మరియు 'bill_no' ని ఇంజెక్ట్ చేస్తుంది!
-                            h["username"] = row["username"]
-                            h["bill_no"] = row["bill_no"]
-                            h["Username"] = row["username"]
-                        cloud_data.append(h)
-                        
-                if cloud_data:
-                    for path in [file_path, temp_path]:
-                        try:
-                            with open(path, "w", encoding="utf-8") as f:
-                                json.dump(cloud_data, f, indent=4, ensure_ascii=False)
-                        except: pass
-                    return cloud_data
-                return local_data
-        except:
-            return local_data
             
     return local_data
 
@@ -131,7 +127,6 @@ def save_json(file_path, data):
                     uname = h.get('username') or h.get('user_id') or h.get('Username') or current_user
                     bno = str(h.get('bill_no') or "100")
                     
-                    # బిల్ ఆబ్జెక్ట్ లోపల కూడా విలువలను ఖచ్చితంగా భద్రపరుస్తుంది
                     h['username'] = uname
                     h['bill_no'] = bno
                     h['Username'] = uname
@@ -141,7 +136,7 @@ def save_json(file_path, data):
                         "id": unique_bill_id, 
                         "username": uname, 
                         "bill_no": bno, 
-                        "sub_client": h.get("sub_client", ""),  # 👈 ఈ లైన్ యాడ్ అయింది!
+                        "sub_client": h.get("sub_client", ""),
                         "data": h
                     })
                 
@@ -177,10 +172,9 @@ def register_system_customer(system_id, password, phone, shop_name, lic_1, lic_2
         st.error(f"❌ డేటాబేస్ సేవింగ్ లోపం: {e}")
         return False
 
-# 1. మీరు ఇచ్చిన కొత్త ఫంక్షన్ (యధావిధిగా)
+# Google Drive Backup ఫంక్షన్లు (యధావిధిగా ఉంచబడ్డాయి)
 def upload_to_client_google_drive(file_path, client_refresh_token):
     try:
-        # క్లయింట్ టోకెన్ మరియు మన సీక్రెట్ కీస్ ఉపయోగించి పర్మిషన్ క్రియేట్ చేయడం
         creds = Credentials(
             token=None,
             refresh_token=client_refresh_token,
@@ -188,39 +182,28 @@ def upload_to_client_google_drive(file_path, client_refresh_token):
             client_id=st.secrets["google_oauth"]["client_id"],
             client_secret=st.secrets["google_oauth"]["client_secret"]
         )
-        
         service = build('drive', 'v3', credentials=creds)
-        
-        # ఫైల్ పేరు, టైప్ సెట్ చేయడం
         file_metadata = {'name': os.path.basename(file_path)}
         media = MediaFileUpload(file_path, mimetype='application/pdf')
         
-        # క్లయింట్ సొంత డ్రైవ్ లోకి అప్‌లోడ్ అవుతుంది
         uploaded_file = service.files().create(
             body=file_metadata,
             media_body=media,
             fields='id, webViewLink'
         ).execute()
-        
-        return uploaded_file.get('webViewLink') # అప్‌లోడ్ అయిన ఫైల్ లింక్ వస్తుంది
+        return uploaded_file.get('webViewLink')
     except Exception as e:
         st.error(f"❌ Google Drive Upload Error: {e}")
         return None
 
 def upload_to_drive(file_path):
-    """సుపాబేస్ నుండి టోకెన్ తీసుకుని, పైనున్న మీ కొత్త ఫంక్షన్‌కి పంపే బ్రిడ్జ్"""
     try:
-        # ✅ కరెక్ట్ పద్ధతి: session_state లోని user_profile నుండి Username ని తీసుకోవడం
-        current_user = st.session_state.get("user_profile", {}).get("Username")
+        current_user = st.session_state.get("user_profile", {}).get("Username", "")
         if not current_user:
             return False
-
-        # సుపాబేస్ నుండి ఆ యూజర్ యొక్క గూగుల్ రీఫ్రెష్ టోకెన్ తెచ్చుకోవడం
         response = supabase_client.table("users").select("google_refresh_token").eq("username", current_user).execute()
-        
         if response.data and response.data[0].get("google_refresh_token"):
             token = response.data[0]["google_refresh_token"]
-            # మీరే రాసిన కొత్త ఫంక్షన్‌ను ఇక్కడి నుండి రన్ చేస్తున్నాం!
             return upload_to_client_google_drive(file_path, token)
         return False
     except Exception as e:
