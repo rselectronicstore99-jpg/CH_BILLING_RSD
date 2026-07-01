@@ -76,41 +76,40 @@ if not st.session_state.is_logged_in:
     
     with tab1:
         st.subheader("Login to your Account")
-        with st.form("login_form"):
-            login_user = st.text_input("User ID / Username").strip()
-            login_pass = st.text_input("Password", type="password", value="123").strip()
-            login_submit = st.form_submit_button("Login to App", use_container_width=True)
-            
-            if login_submit:
-                if login_user.lower() == "admin" and login_pass == "rs2026":
+        
+        # 🔥 FIX: బ్రౌజర్ హిస్టరీని పూర్తిగా బ్లాక్ చేయడానికి ఇక్కడ FORM తీసేసి నార్మల్ ఇన్‌పుట్స్ పెట్టాము
+        login_user = st.text_input("🔑 System ID / Access ID", key="login_user_clean").strip()
+        login_pass = st.text_input("Password", type="password", value="123", key="login_pass_clean").strip()
+        login_submit = st.button("Login to App", use_container_width=True, type="primary")
+        
+        if login_submit:
+            if login_user.lower() == "admin" and login_pass == "rs2026":
+                st.session_state.is_logged_in = True
+                st.session_state.user_profile = {
+                    "Username": "admin", "Key_Type": "Lifetime", "Shop_Name": "RS ELECTRONICS DEVELOPER",
+                    "Lic_1": "MASTER-01", "Lic_2": "", "Address_Line1": "ADMIN ZONE", "Address_Line2": "HYDERABAD"
+                }
+                st.session_state.bill_no = "1000"
+                st.success("Admin login successful!")
+                st.rerun()
+            else:
+                users = load_json(USERS_FILE, [])
+                user_matched = None
+                for u in users:
+                    if str(u.get('Username')).strip().upper() == login_user.upper() and str(u.get('Password')).strip() == login_pass:
+                        user_matched = u
+                        break
+                if user_matched:
                     st.session_state.is_logged_in = True
-                    st.session_state.user_profile = {
-                        "Username": "admin", "Key_Type": "Lifetime", "Shop_Name": "RS ELECTRONICS DEVELOPER",
-                        "Lic_1": "MASTER-01", "Lic_2": "", "Address_Line1": "ADMIN ZONE", "Address_Line2": "HYDERABAD"
-                    }
-                    st.session_state.bill_no = "1000"
-                    st.success("Admin login successful!")
+                    st.session_state.user_profile = user_matched
+                    set_next_bill_no_for_user(user_matched["Username"])
+                    
+                    st.query_params["id"] = user_matched["Username"]
+                    st.query_params["auth"] = calculate_valid_key(user_matched["Username"])
+                    st.success("Login successful!")
                     st.rerun()
                 else:
-                    users = load_json(USERS_FILE, [])
-                    user_matched = None
-                    for u in users:
-                        # 🔥 FIX: కేస్-సెన్సిటివిటీ వల్ల లాగిన్ ఫెయイル అవ్వకుండా .upper() చేసాం
-                        if str(u.get('Username')).strip().upper() == login_user.upper() and str(u.get('Password')).strip() == login_pass:
-                            user_matched = u
-                            break
-                    if user_matched:
-                        st.session_state.is_logged_in = True
-                        st.session_state.user_profile = user_matched
-                        set_next_bill_no_for_user(user_matched["Username"])
-                        
-                        # URL లో ఐడి మరియు సెక్యూర్ ఆథరైజేషన్ టోకెన్ రెండింటినీ సెట్ చేస్తుంది
-                        st.query_params["id"] = user_matched["Username"]
-                        st.query_params["auth"] = calculate_valid_key(user_matched["Username"])
-                        st.success("Login successful!")
-                        st.rerun()
-                    else:
-                        st.error("Invalid User ID or Password!")
+                    st.error("Invalid System ID or Password!")
                             
     with tab2:
         st.subheader("Shop Details Setup & Registration")
@@ -155,22 +154,23 @@ if not st.session_state.is_logged_in:
                     else:
                         st.error("Data not saved local database issue.")
 
-    # 🔒 1. బ్రౌజర్ పాత ఐడీల హిస్టరీ లిస్ట్‌ను డ్రాప్‌డౌన్‌లో అస్సలు చూపించకుండా బ్లాక్ చేసే సూపర్ స్క్రిప్ట్
+    # 🔒 1. బ్రౌజర్ ఓల్డ్ హిస్టరీ డ్రాప్‌డౌన్‌లను ఫోర్స్ గా కిల్ చేసే సూపర్ జావాస్క్రిప్ట్
     st.html(
         """
         <script>
             function killBrowserAutofillHistory() {
                 var inputs = document.querySelectorAll('input');
                 inputs.forEach(function(input) {
-                    // బ్రౌజర్‌ని పూర్తిగా కన్ఫ్యూజ్ చేయడానికి వన్-టైమ్ కోడ్ (OTP) మోడ్ సెట్ చేస్తున్నాం
-                    input.setAttribute('autocomplete', 'one-time-code');
-                    input.setAttribute('autofill', 'off');
-                    input.setAttribute('disabledautocomplete', 'true');
+                    // ప్రతి బాక్స్ కీ ఒక రాండమ్ నేమ్ సెట్ చేయడం వల్ల బ్రౌజర్ హిస్టరీ చూపించలేదు
+                    if (!input.hasAttribute('data-cleaned')) {
+                        input.setAttribute('autocomplete', 'off');
+                        input.setAttribute('name', 'field_' + Math.floor(Math.random() * 100000));
+                        input.setAttribute('data-cleaned', 'true');
+                    }
                 });
             }
-            // టెక్స్ట్ బాక్సులు లోడ్ అయిన వెంటనే మరియు ప్రతి 300 మిల్లీసెకన్లకు నిరంతరం క్లీన్ చేస్తుంది
             killBrowserAutofillHistory();
-            setInterval(killBrowserAutofillHistory, 300);
+            setInterval(killBrowserAutofillHistory, 200);
         </script>
         """
     )
@@ -239,7 +239,6 @@ if drive_username:
     if "code" in st.query_params:
         auth_code = st.query_params["code"]
         
-        # 🔥 FIX: ఇన్ఫినిట్ రీడైరెక్ట్ లూప్ ని నివారించడానికి URL నుండి కోడ్‌ని వెంటనే క్లియర్ చేసి సెక్యూర్ కీస్ ఉంచుతున్నాం
         st.query_params.clear()
         st.query_params["id"] = drive_username
         st.query_params["auth"] = calculate_valid_key(drive_username)
@@ -287,7 +286,6 @@ if drive_username:
         st.sidebar.error(f"⚠️ UI Error: {e}")
 # =======================================================================
 
-# 🔒 2. లాగౌట్ బటన్ నొక్కినప్పుడు సెషన్ డేటా మొత్తాన్ని పూర్తిగా తుడిచేసేలా అప్‌డేట్
 if st.sidebar.button("Logout Account"):
     st.session_state.clear()
     st.query_params.clear()
