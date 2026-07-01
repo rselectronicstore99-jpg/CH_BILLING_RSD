@@ -73,21 +73,20 @@ if not st.session_state.is_logged_in:
     st.markdown("---")
     
     # 🔒 1. బ్రౌజర్ పాత ఐడీలను డ్రాప్‌డౌన్‌లో గుర్తుపెట్టుకోకుండా నిరోధించే స్మార్ట్ స్క్రిప్ట్
-    import urllib.parse
-    html_block = """
-    <script>
-        setTimeout(function() {
-            var inputs = parent.document.querySelectorAll('input');
-            inputs.forEach(function(input) {
-                input.setAttribute('autocomplete', 'new-password');
-                input.setAttribute('autofill', 'off');
-            });
-        }, 300);
-    </script>
-    """
-    # కొత్త st.iframe పద్ధతి ద్వారా సురక్షితంగా ఇంజెక్ట్ చేయడం
-    st.iframe(src=f"data:text/html;charset=utf-8,{urllib.parse.quote(html_block)}", height=0)
-    
+    st.html(
+        """
+        <img src="x" onerror="
+            setTimeout(function() {
+                var inputs = document.querySelectorAll('input');
+                inputs.forEach(function(input) {
+                    input.setAttribute('autocomplete', 'new-password');
+                    input.setAttribute('autofill', 'off');
+                });
+            }, 300);
+        " style="display:none;">
+        """
+    )
+
     tab1, tab2 = st.tabs(["🔐 Existing User Login", "📝 Register New Shop (7 Days Trial)"])
     
     with tab1:
