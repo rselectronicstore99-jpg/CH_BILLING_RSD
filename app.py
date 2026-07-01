@@ -72,21 +72,6 @@ if not st.session_state.is_logged_in:
     st.title("RS Electronic Ultimate")
     st.markdown("---")
     
-    # 🔒 1. బ్రౌజర్ పాత ఐడీలను డ్రాప్‌డౌన్‌లో గుర్తుపెట్టుకోకుండా నిరోధించే స్మార్ట్ స్క్రిప్ట్
-    st.html(
-        """
-        <img src="x" onerror="
-            setTimeout(function() {
-                var inputs = document.querySelectorAll('input');
-                inputs.forEach(function(input) {
-                    input.setAttribute('autocomplete', 'new-password');
-                    input.setAttribute('autofill', 'off');
-                });
-            }, 300);
-        " style="display:none;">
-        """
-    )
-
     tab1, tab2 = st.tabs(["🔐 Existing User Login", "📝 Register New Shop (7 Days Trial)"])
     
     with tab1:
@@ -169,6 +154,25 @@ if not st.session_state.is_logged_in:
                         st.rerun()
                     else:
                         st.error("Data not saved local database issue.")
+
+        # 🔒 బ్రౌజర్ పాత హిస్టరీ/డ్రాప్‌డౌన్ చూపించకుండా ఉండే క్లీన్ ఆటోఫిల్ స్వీపర్ స్క్రిప్ట్
+        st.html(
+            """
+            <script>
+                function cleanAutofillHistory() {
+                    var inputs = document.querySelectorAll('input');
+                    inputs.forEach(function(input) {
+                        input.setAttribute('autocomplete', 'new-password');
+                        input.setAttribute('autofill', 'off');
+                    });
+                }
+                // ఫార్మ్ లోడ్ అయిన వెంటనే మరియు కొద్ది సమయం తర్వాత క్లీన్ చేస్తుంది
+                cleanAutofillHistory();
+                setTimeout(cleanAutofillHistory, 150);
+                setTimeout(cleanAutofillHistory, 400);
+            </script>
+            """
+        )
         st.stop()
 
 # 🔑 లైసెన్స్ వెరిఫికేషన్ మరియు లోకల్ అప్‌డేట్
