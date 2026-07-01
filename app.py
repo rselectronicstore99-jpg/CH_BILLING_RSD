@@ -49,9 +49,8 @@ url_params = st.query_params
 url_id = url_params.get("id", None)
 url_auth = url_params.get("auth", None)
 
-# 🔄 సురక్షితమైన URL ఆటో-లాగిన్ మేనేజ్మెంట్ (🔐 Auth Key తో పక్కా 100% సెక్యూరిటీ బూస్ట్)
+# 🔄 URL ఆటో-లాగిన్ మేనేజ్మెంట్
 if not st.session_state.is_logged_in and url_id and url_auth:
-    # సీక్రెట్ సాల్ట్ తో జనరేట్ అయిన హాష్ టోకెన్ మ్యాచ్ అయితేనే లోపలికి రానిస్తుంది
     if str(url_auth).strip() == calculate_valid_key(url_id):
         users = load_json(USERS_FILE, [])
         user_found = None
@@ -77,39 +76,40 @@ if not st.session_state.is_logged_in:
     with tab1:
         st.subheader("Login to your Account")
         
-        # 🔥 FIX: బ్రౌజర్ హిస్టరీని పూర్తిగా బ్లాక్ చేయడానికి ఇక్కడ FORM తీసేసి నార్మల్ ఇన్‌పుట్స్ పెట్టాము
-        login_user = st.text_input("🔑 System ID / Access ID", key="login_user_clean").strip()
-        login_pass = st.text_input("Password", type="password", value="123", key="login_pass_clean").strip()
-        login_submit = st.button("Login to App", use_container_width=True, type="primary")
-        
-        if login_submit:
-            if login_user.lower() == "admin" and login_pass == "rs2026":
-                st.session_state.is_logged_in = True
-                st.session_state.user_profile = {
-                    "Username": "admin", "Key_Type": "Lifetime", "Shop_Name": "RS ELECTRONICS DEVELOPER",
-                    "Lic_1": "MASTER-01", "Lic_2": "", "Address_Line1": "ADMIN ZONE", "Address_Line2": "HYDERABAD"
-                }
-                st.session_state.bill_no = "1000"
-                st.success("Admin login successful!")
-                st.rerun()
-            else:
-                users = load_json(USERS_FILE, [])
-                user_matched = None
-                for u in users:
-                    if str(u.get('Username')).strip().upper() == login_user.upper() and str(u.get('Password')).strip() == login_pass:
-                        user_matched = u
-                        break
-                if user_matched:
+        # 🔥 FIX: ఇక్కడ ఫార్మ్ ని పునరుద్ధరించాము, దీనివల్ల లాగిన్ డేటా పక్కాగా సబ్మిట్ అవుతుంది
+        with st.form("login_form_final"):
+            login_user = st.text_input("🔑 System ID / Access ID", key="user_login_inp").strip()
+            login_pass = st.text_input("Password", type="password", value="123", key="pass_login_inp").strip()
+            login_submit = st.form_submit_button("Login to App", use_container_width=True)
+            
+            if login_submit:
+                if login_user.lower() == "admin" and login_pass == "rs2026":
                     st.session_state.is_logged_in = True
-                    st.session_state.user_profile = user_matched
-                    set_next_bill_no_for_user(user_matched["Username"])
-                    
-                    st.query_params["id"] = user_matched["Username"]
-                    st.query_params["auth"] = calculate_valid_key(user_matched["Username"])
-                    st.success("Login successful!")
+                    st.session_state.user_profile = {
+                        "Username": "admin", "Key_Type": "Lifetime", "Shop_Name": "RS ELECTRONICS DEVELOPER",
+                        "Lic_1": "MASTER-01", "Lic_2": "", "Address_Line1": "ADMIN ZONE", "Address_Line2": "HYDERABAD"
+                    }
+                    st.session_state.bill_no = "1000"
+                    st.success("Admin login successful!")
                     st.rerun()
                 else:
-                    st.error("Invalid System ID or Password!")
+                    users = load_json(USERS_FILE, [])
+                    user_matched = None
+                    for u in users:
+                        if str(u.get('Username')).strip().upper() == login_user.upper() and str(u.get('Password')).strip() == login_pass:
+                            user_matched = u
+                            break
+                    if user_matched:
+                        st.session_state.is_logged_in = True
+                        st.session_state.user_profile = user_matched
+                        set_next_bill_no_for_user(user_matched["Username"])
+                        
+                        st.query_params["id"] = user_matched["Username"]
+                        st.query_params["auth"] = calculate_valid_key(user_matched["Username"])
+                        st.success("Login successful!")
+                        st.rerun()
+                    else:
+                        st.error("Invalid System ID or Password!")
                             
     with tab2:
         st.subheader("Shop Details Setup & Registration")
@@ -154,23 +154,21 @@ if not st.session_state.is_logged_in:
                     else:
                         st.error("Data not saved local database issue.")
 
-    # 🔒 1. బ్రౌజర్ ఓల్డ్ హిస్టరీ డ్రాప్‌డౌన్‌లను ఫోర్స్ గా కిల్ చేసే సూపర్ జావాస్క్రిప్ట్
+    # 🔒 🔥 తిరుగులేని సేఫ్ ట్రిక్: ఇన్‌పుట్ నేమ్స్ మార్చకుండా, బ్రౌజర్ హిస్టరీని క్లీన్ చేసే కోడ్
     st.html(
         """
         <script>
-            function killBrowserAutofillHistory() {
+            function applySafeAutofillBlock() {
                 var inputs = document.querySelectorAll('input');
                 inputs.forEach(function(input) {
-                    // ప్రతి బాక్స్ కీ ఒక రాండమ్ నేమ్ సెట్ చేయడం వల్ల బ్రౌజర్ హిస్టరీ చూపించలేదు
-                    if (!input.hasAttribute('data-cleaned')) {
-                        input.setAttribute('autocomplete', 'off');
-                        input.setAttribute('name', 'field_' + Math.floor(Math.random() * 100000));
-                        input.setAttribute('data-cleaned', 'true');
-                    }
+                    // బ్రౌజర్‌కి ఇది OTP బాక్స్ అని అబద్ధం చెప్తున్నాం, దాంతో పాత హిస్టరీ లిస్ట్ రాదు. 
+                    // Streamlit కనెక్షన్ కూడా కట్ అవ్వదు!
+                    input.setAttribute('autocomplete', 'one-time-code');
+                    input.setAttribute('autofill', 'off');
                 });
             }
-            killBrowserAutofillHistory();
-            setInterval(killBrowserAutofillHistory, 200);
+            applySafeAutofillBlock();
+            setInterval(applySafeAutofillBlock, 400); // ప్రతి 400ms కి రన్ అవుతుంది
         </script>
         """
     )
