@@ -77,20 +77,23 @@ if not st.session_state.is_logged_in:
         st.subheader("Login to your Account")
         
         with st.form("login_form_final"):
-            # 🔥 1. HONEYPOT TRICK: బ్రౌజర్ ని మోసం చేయడానికి ఫామ్ లోపల పెట్టిన అదృశ్య (Invisible) నకిలీ ఇన్‌పుట్ బాక్సులు
-            # బ్రౌజర్ పాత హిస్టరీ మొత్తాన్ని వీటికే అప్లై చేసుకుంటుంది, మన రియల్ బాక్సులను వదిలేస్తుంది!
+            # 🔥 FIX 1: క్రోమ్ ని కన్ఫ్యూజ్ చేయడానికి నకిలీ ఇన్విజిబుల్ బాక్స్
             st.html(
                 """
                 <div style="opacity: 0; position: absolute; top: 0; left: 0; height: 0; width: 0; overflow: hidden; z-index: -1;">
-                    <input type="text" name="username" tabindex="-1" autocomplete="username">
-                    <input type="password" name="password" tabindex="-1" autocomplete="current-password">
+                    <input type="text" name="b_user" autocomplete="username">
+                    <input type="password" name="b_pass" autocomplete="current-password">
                 </div>
                 """
             )
             
-            # 🔥 2. మన ఒరిజినల్ ఇన్‌పుట్ బాక్సులు (ఇప్పుడు వీటిపై ఎటువంటి డ్రాప్‌డౌన్ హిస్టరీ రాదు, లాగిన్ పక్కాగా అవుతుంది)
-            login_user = st.text_input("🔑 System ID / Access ID", key="user_login_inp").strip()
-            login_pass = st.text_input("Password", type="password", value="123", key="pass_login_inp").strip()
+            # 🔥 FIX 2: క్రోమ్ కంటికి లాగిన్ బాక్స్ అని తెలియకుండా మార్చిన లేబులింగ్ సిస్టమ్
+            st.markdown("⚡ **🔑 System ID / Access ID**")
+            login_user = st.text_input("Enter Code Here", label_visibility="collapsed", key="txt_stealth_code_input").strip()
+            
+            st.markdown("⚡ **Password**")
+            login_pass = st.text_input("Enter Pass Here", type="password", value="123", label_visibility="collapsed", key="txt_stealth_pass_input").strip()
+            
             login_submit = st.form_submit_button("Login to App", use_container_width=True)
             
             if login_submit:
@@ -165,27 +168,24 @@ if not st.session_state.is_logged_in:
                     else:
                         st.error("Data not saved local database issue.")
 
-    # 🔒 అదనపు రక్షణ కోసం ఒరిజినల్ బాక్సుల ఆటోకంప్లీట్ ఆఫ్ చేసే సేఫ్ స్క్రిప్ట్
+    # 🔒 FIX 3: బ్రౌజర్ ఎప్పుడు డ్రాప్‌డౌన్ లిస్ట్ ఓపెన్ చేసినా ఆటోమేటిక్‌గా క్లోజ్ చేసే లైవ్ అబ్జర్వర్ స్క్రిప్ట్
     st.html(
         """
         <script>
-            function hideDropdownHistory() {
-                var inputs = document.querySelectorAll('input');
-                inputs.forEach(function(input) {
-                    if(input.id && (input.id.includes('user_login_inp') || input.id.includes('pass_login_inp'))) {
-                        input.setAttribute('autocomplete', 'new-password');
-                        input.setAttribute('autofill', 'off');
-                    }
+            const killAutofillObserver = new MutationObserver(() => {
+                document.querySelectorAll('input').forEach(input => {
+                    input.setAttribute('autocomplete', 'new-password');
+                    input.setAttribute('autofill', 'off');
+                    input.setAttribute('aria-autocomplete', 'none');
                 });
-            }
-            hideDropdownHistory();
-            setTimeout(hideDropdownHistory, 500);
+            });
+            killAutofillObserver.observe(document.body, { childList: true, subtree: true });
         </script>
         """
     )
     st.stop()
 
-# 🔑 లైసెన్స్ వెриఫికేషన్ మరియు లోకల్ అప్‌డేట్
+# 🔑 లైసెన్స్ వెరిఫికేషన్ మరియు లోకల్ అప్‌డేట్
 current_user = st.session_state.user_profile
 
 if current_user.get("Key_Type") == "Trial":
@@ -303,4 +303,5 @@ if st.sidebar.button("Logout Account"):
 st.sidebar.info(f"ID: {current_user.get('Username')}")
 
 from billing_dashboard import show_billing_dashboard
+current_user = st.session_state.user_profile
 show_billing_dashboard(current_user)
