@@ -76,8 +76,19 @@ if not st.session_state.is_logged_in:
     with tab1:
         st.subheader("Login to your Account")
         
-        # 🔥 FIX: ఇక్కడ ఫార్మ్ ని పునరుద్ధరించాము, దీనివల్ల లాగిన్ డేటా పక్కాగా సబ్మిట్ అవుతుంది
         with st.form("login_form_final"):
+            # 🔥 1. HONEYPOT TRICK: బ్రౌజర్ ని మోసం చేయడానికి ఫామ్ లోపల పెట్టిన అదృశ్య (Invisible) నకిలీ ఇన్‌పుట్ బాక్సులు
+            # బ్రౌజర్ పాత హిస్టరీ మొత్తాన్ని వీటికే అప్లై చేసుకుంటుంది, మన రియల్ బాక్సులను వదిలేస్తుంది!
+            st.html(
+                """
+                <div style="opacity: 0; position: absolute; top: 0; left: 0; height: 0; width: 0; overflow: hidden; z-index: -1;">
+                    <input type="text" name="username" tabindex="-1" autocomplete="username">
+                    <input type="password" name="password" tabindex="-1" autocomplete="current-password">
+                </div>
+                """
+            )
+            
+            # 🔥 2. మన ఒరిజినల్ ఇన్‌పుట్ బాక్సులు (ఇప్పుడు వీటిపై ఎటువంటి డ్రాప్‌డౌన్ హిస్టరీ రాదు, లాగిన్ పక్కాగా అవుతుంది)
             login_user = st.text_input("🔑 System ID / Access ID", key="user_login_inp").strip()
             login_pass = st.text_input("Password", type="password", value="123", key="pass_login_inp").strip()
             login_submit = st.form_submit_button("Login to App", use_container_width=True)
@@ -154,27 +165,27 @@ if not st.session_state.is_logged_in:
                     else:
                         st.error("Data not saved local database issue.")
 
-    # 🔒 🔥 తిరుగులేని సేఫ్ ట్రిక్: ఇన్‌పుట్ నేమ్స్ మార్చకుండా, బ్రౌజర్ హిస్టరీని క్లీన్ చేసే కోడ్
+    # 🔒 అదనపు రక్షణ కోసం ఒరిజినల్ బాక్సుల ఆటోకంప్లీట్ ఆఫ్ చేసే సేఫ్ స్క్రిప్ట్
     st.html(
         """
         <script>
-            function applySafeAutofillBlock() {
+            function hideDropdownHistory() {
                 var inputs = document.querySelectorAll('input');
                 inputs.forEach(function(input) {
-                    // బ్రౌజర్‌కి ఇది OTP బాక్స్ అని అబద్ధం చెప్తున్నాం, దాంతో పాత హిస్టరీ లిస్ట్ రాదు. 
-                    // Streamlit కనెక్షన్ కూడా కట్ అవ్వదు!
-                    input.setAttribute('autocomplete', 'one-time-code');
-                    input.setAttribute('autofill', 'off');
+                    if(input.id && (input.id.includes('user_login_inp') || input.id.includes('pass_login_inp'))) {
+                        input.setAttribute('autocomplete', 'new-password');
+                        input.setAttribute('autofill', 'off');
+                    }
                 });
             }
-            applySafeAutofillBlock();
-            setInterval(applySafeAutofillBlock, 400); // ప్రతి 400ms కి రన్ అవుతుంది
+            hideDropdownHistory();
+            setTimeout(hideDropdownHistory, 500);
         </script>
         """
     )
     st.stop()
 
-# 🔑 లైసెన్స్ వెరిఫికేషన్ మరియు లోకల్ అప్‌డేట్
+# 🔑 లైసెన్స్ వెриఫికేషన్ మరియు లోకల్ అప్‌డేట్
 current_user = st.session_state.user_profile
 
 if current_user.get("Key_Type") == "Trial":
