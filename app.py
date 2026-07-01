@@ -71,7 +71,7 @@ if not st.session_state.is_logged_in and url_id and url_auth:
 if not st.session_state.is_logged_in:
     st.title("RS Electronic Ultimate")
     st.markdown("---")
-    
+
     tab1, tab2 = st.tabs(["🔐 Existing User Login", "📝 Register New Shop (7 Days Trial)"])
     
     with tab1:
@@ -95,7 +95,7 @@ if not st.session_state.is_logged_in:
                     users = load_json(USERS_FILE, [])
                     user_matched = None
                     for u in users:
-                        # 🔥 FIX: కేస్-సెన్సిటివిటీ వల్ల లాగిన్ ఫెయిల్ అవ్వకుండా .upper() చేసాం
+                        # 🔥 FIX: కేస్-సెన్సిటివిటీ వల్ల లాగిన్ ఫెయイル అవ్వకుండా .upper() చేసాం
                         if str(u.get('Username')).strip().upper() == login_user.upper() and str(u.get('Password')).strip() == login_pass:
                             user_matched = u
                             break
@@ -155,25 +155,26 @@ if not st.session_state.is_logged_in:
                     else:
                         st.error("Data not saved local database issue.")
 
-        # 🔒 బ్రౌజర్ పాత హిస్టరీ/డ్రాప్‌డౌన్ చూపించకుండా ఉండే క్లీన్ ఆటోఫిల్ స్వీపర్ స్క్రిప్ట్
-        st.html(
-            """
-            <script>
-                function cleanAutofillHistory() {
-                    var inputs = document.querySelectorAll('input');
-                    inputs.forEach(function(input) {
-                        input.setAttribute('autocomplete', 'new-password');
-                        input.setAttribute('autofill', 'off');
-                    });
-                }
-                // ఫార్మ్ లోడ్ అయిన వెంటనే మరియు కొద్ది సమయం తర్వాత క్లీన్ చేస్తుంది
-                cleanAutofillHistory();
-                setTimeout(cleanAutofillHistory, 150);
-                setTimeout(cleanAutofillHistory, 400);
-            </script>
-            """
-        )
-        st.stop()
+    # 🔒 1. బ్రౌజర్ పాత ఐడీల హిస్టరీ లిస్ట్‌ను డ్రాప్‌డౌన్‌లో అస్సలు చూపించకుండా బ్లాక్ చేసే సూపర్ స్క్రిప్ట్
+    st.html(
+        """
+        <script>
+            function killBrowserAutofillHistory() {
+                var inputs = document.querySelectorAll('input');
+                inputs.forEach(function(input) {
+                    // బ్రౌజర్‌ని పూర్తిగా కన్ఫ్యూజ్ చేయడానికి వన్-టైమ్ కోడ్ (OTP) మోడ్ సెట్ చేస్తున్నాం
+                    input.setAttribute('autocomplete', 'one-time-code');
+                    input.setAttribute('autofill', 'off');
+                    input.setAttribute('disabledautocomplete', 'true');
+                });
+            }
+            // టెక్స్ట్ బాక్సులు లోడ్ అయిన వెంటనే మరియు ప్రతి 300 మిల్లీసెకన్లకు నిరంతరం క్లీన్ చేస్తుంది
+            killBrowserAutofillHistory();
+            setInterval(killBrowserAutofillHistory, 300);
+        </script>
+        """
+    )
+    st.stop()
 
 # 🔑 లైసెన్స్ వెరిఫికేషన్ మరియు లోకల్ అప్‌డేట్
 current_user = st.session_state.user_profile
