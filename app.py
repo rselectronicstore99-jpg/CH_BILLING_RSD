@@ -72,6 +72,23 @@ if not st.session_state.is_logged_in:
     st.title("RS Electronic Ultimate")
     st.markdown("---")
     
+    # 🔒 1. బ్రౌజర్ పాత ఐడీలను డ్రాప్‌డౌన్‌లో గుర్తుపెట్టుకోకుండా నిరోధించే స్మార్ట్ స్క్రిప్ట్
+    import streamlit.components.v1 as components
+    components.html(
+        """
+        <script>
+            setTimeout(function() {
+                var inputs = parent.document.querySelectorAll('input');
+                inputs.forEach(function(input) {
+                    input.setAttribute('autocomplete', 'new-password');
+                    input.setAttribute('autofill', 'off');
+                });
+            }, 300);
+        </script>
+        """,
+        height=0, width=0
+    )
+    
     tab1, tab2 = st.tabs(["🔐 Existing User Login", "📝 Register New Shop (7 Days Trial)"])
     
     with tab1:
@@ -267,8 +284,9 @@ if drive_username:
         st.sidebar.error(f"⚠️ UI Error: {e}")
 # =======================================================================
 
+# 🔒 2. లాగౌట్ బటన్ నొక్కినప్పుడు సెషన్ డేటా మొత్తాన్ని పూర్తిగా తుడిచేసేలా అప్‌డేట్
 if st.sidebar.button("Logout Account"):
-    st.session_state.is_logged_in = False
+    st.session_state.clear()
     st.query_params.clear()
     st.rerun()
 
